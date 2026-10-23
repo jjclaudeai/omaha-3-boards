@@ -1,0 +1,834 @@
+<title>Omaha 3 Boards Admin</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@500;700;800&display=swap">
+<style>
+/* Mise en page : barre latérale de navigation + espace de travail ; même palette que l'app (nuit, tapis, or). */
+:root {
+  --bg: #0D1626; --raised: #15233A; --panel: #1B2D49; --line: #2A4166;
+  --hi: #F2F5FA; --lo: #93A5BF;
+  --gold: #F6C453; --gold-ink: #241A03; --felt: #1F7A4F; --mint: #3FD68E; --ruby: #E0584F; --sky: #55A8FF;
+  --display: "Baloo 2", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Nunito", "Segoe UI", system-ui, sans-serif;
+  --r: 10px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --bg: #EEF2F8; --raised: #FFFFFF; --panel: #E3E9F2; --line: #C9D3E2; --hi: #0F1B2E; --lo: #4D5F7C;
+  --gold: #A9700C; --gold-ink: #FFFFFF; --felt: #1F7A4F; --mint: #137F55; --ruby: #C13A31; --sky: #1F68C9; color-scheme: light } }
+:root[data-theme="light"] {
+  --bg: #EEF2F8; --raised: #FFFFFF; --panel: #E3E9F2; --line: #C9D3E2; --hi: #0F1B2E; --lo: #4D5F7C;
+  --gold: #A9700C; --gold-ink: #FFFFFF; --felt: #1F7A4F; --mint: #137F55; --ruby: #C13A31; --sky: #1F68C9; color-scheme: light }
+
+* { box-sizing: border-box }
+html, body { height: 100% }
+body { background: var(--bg); color: var(--hi); font: 500 14px/1.45 var(--body); }
+h1, h2, h3 { font-family: var(--display); font-weight: 800; line-height: 1.1; margin: 0; text-wrap: balance }
+h1 { font-size: 1.9rem } h2 { font-size: 1.25rem } h3 { font-size: 1rem; font-weight: 600 }
+.num, td.n, .kpi b { font-variant-numeric: tabular-nums }
+button, input, select { font: inherit; color: inherit }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px }
+
+.shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100% }
+.side { background: var(--raised); border-right: 1px solid var(--line); padding: 20px 12px; display: flex; flex-direction: column; gap: 18px; position: sticky; top: 0; height: 100vh }
+.brand { font-family: var(--display); font-weight: 800; font-size: 1.2rem; display: flex; gap: 10px; align-items: center; padding-inline: 8px }
+.brand small { display: block; font: 700 .68rem var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--lo) }
+.boards { display: grid; grid-template-columns: repeat(3, 8px); gap: 3px }
+.boards i { height: 22px; border-radius: 2px; background: var(--felt) } .boards i:nth-child(2) { background: var(--gold) }
+nav { display: flex; flex-direction: column; gap: 2px }
+nav a { color: var(--lo); text-decoration: none; padding: 9px 12px; border-radius: 8px; font-weight: 700 }
+nav a:hover { color: var(--hi); background: var(--panel) }
+nav a[aria-current="page"] { color: var(--hi); background: var(--panel); box-shadow: inset 3px 0 0 var(--gold) }
+.side .foot { margin-top: auto; font-size: .78rem; color: var(--lo); padding-inline: 8px; display: grid; gap: 8px }
+
+main { padding-block: 28px 120px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); min-width: 0 }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 22px }
+.head { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; justify-content: space-between }
+.head p { margin: 4px 0 0; color: var(--lo) }
+.demo { font-size: .78rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--gold); border: 1px dashed var(--gold); border-radius: 999px; padding: 3px 10px }
+
+.box { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; min-width: 0; display: grid; gap: 14px; align-content: start }
+.box > header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap }
+.box > header p { margin: 0; color: var(--lo); font-size: .85rem }
+.box > * { min-width: 0 }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px }
+.grid3 { display: grid; grid-template-columns: 2fr 1fr; gap: 22px }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px }
+.kpi { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 2px }
+.kpi span { color: var(--lo); font-size: .74rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase }
+.kpi b { font-family: var(--display); font-size: 1.7rem; font-weight: 800 }
+.kpi em { font-style: normal; font-size: .8rem; color: var(--lo) }
+.kpi.gold b { color: var(--gold) }
+
+.scroll { overflow-x: auto; min-width: 0 }
+table { border-collapse: collapse; width: 100% }
+th { text-align: left; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--lo); font-weight: 800; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap }
+td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap }
+td.n, th.n { text-align: right }
+tr.click { cursor: pointer } tr.click:hover td { background: var(--panel) }
+.who { display: flex; align-items: center; gap: 10px }
+.av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 800 .85rem var(--display); color: #fff; flex: none }
+.muted { color: var(--lo) } .small { font-size: .8rem }
+
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: .75rem; font-weight: 800; padding: 2px 9px; border-radius: 999px; background: var(--panel); white-space: nowrap }
+.pill i { width: 8px; height: 8px; border-radius: 50% }
+.pill.bad { background: color-mix(in srgb, var(--ruby) 22%, transparent); color: var(--ruby) }
+.pill.ok { background: color-mix(in srgb, var(--mint) 18%, transparent); color: var(--mint) }
+.pill.warn { background: color-mix(in srgb, var(--gold) 20%, transparent); color: var(--gold) }
+
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+input[type="text"], input[type="number"], input[type="search"], select { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-width: 0 }
+input[type="number"] { width: 110px; text-align: right; font-variant-numeric: tabular-nums }
+input.w-s { width: 80px } input.w-m { width: 150px }
+input[type="color"] { width: 38px; height: 30px; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg) }
+input[type="search"] { flex: 1 1 220px }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 7px 14px; font-weight: 800; cursor: pointer }
+.btn:hover { border-color: var(--lo) }
+.btn.primary { background: var(--gold); color: var(--gold-ink); border-color: var(--gold) }
+.btn.danger { color: var(--ruby); border-color: color-mix(in srgb, var(--ruby) 50%, transparent) }
+.btn.ghost { background: transparent }
+.btn:disabled { opacity: .45; cursor: default }
+
+.hbars { display: grid; gap: 8px }
+.hbar { display: grid; grid-template-columns: 110px minmax(0, 1fr) 80px; align-items: center; gap: 10px; font-size: .85rem }
+.hbar .track { height: 10px; background: var(--panel); border-radius: 5px; overflow: hidden }
+.hbar .fill { height: 100%; border-radius: 5px }
+.hbar .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 800 }
+
+.chart { width: 100%; height: auto; display: block }
+.chart .grid { stroke: var(--line); stroke-width: 1 }
+.chart .ax { fill: var(--lo); font: 700 11px var(--body) }
+.chart .bar { fill: color-mix(in srgb, var(--gold) 55%, transparent) }
+.chart .bar.now { fill: var(--gold) }
+.chart .bar.alt { fill: color-mix(in srgb, var(--sky) 55%, transparent) }
+.chart .bar.alt.now { fill: var(--sky) }
+
+.list { display: grid; gap: 0 }
+.list > div { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line) }
+.list > div:last-child { border-bottom: 0 }
+.plus { color: var(--mint); font-weight: 800 } .minus { color: var(--ruby); font-weight: 800 }
+
+.seg { display: inline-flex; flex-wrap: wrap; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 3px; gap: 2px }
+.seg button { border: 0; background: transparent; padding: 5px 12px; border-radius: 7px; font-weight: 800; color: var(--lo); cursor: pointer }
+.seg button[aria-pressed="true"] { background: var(--panel); color: var(--hi) }
+
+.checks { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none }
+.checks li { display: flex; gap: 8px; align-items: baseline; font-size: .88rem }
+.checks li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--mint); flex: none; transform: translateY(-1px) }
+.checks li.w::before { background: var(--gold) } .checks li.e::before { background: var(--ruby) }
+
+.back { width: 34px; height: 48px; border-radius: 5px; border: 2px solid rgba(255,255,255,.75); box-shadow: 0 1px 3px rgba(0,0,0,.35) }
+.feltchip { width: 58px; height: 34px; border-radius: 17px; box-shadow: inset 0 0 0 3px rgba(0,0,0,.25) }
+
+/* Fiche joueur */
+.scrim { position: fixed; inset: 0; background: rgba(5,10,20,.55); z-index: 20 }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(520px, 100%); background: var(--raised); border-left: 1px solid var(--line); z-index: 21; overflow-y: auto;
+  padding-block: calc(20px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); padding-left: 20px; padding-right: max(20px, env(safe-area-inset-right, 0px)); display: grid; gap: 18px; align-content: start }
+.drawer .top { display: flex; gap: 14px; align-items: center }
+.drawer .top .av { width: 56px; height: 56px; font-size: 1.4rem }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
+.stats div { background: var(--panel); border-radius: 8px; padding: 8px 10px; display: grid }
+.stats span { font-size: .7rem; color: var(--lo); font-weight: 800; letter-spacing: .06em; text-transform: uppercase }
+.stats b { font-family: var(--display); font-size: 1.1rem; font-variant-numeric: tabular-nums }
+.formrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.formrow input[type="text"] { flex: 1 1 160px }
+.confirm { background: color-mix(in srgb, var(--ruby) 12%, var(--raised)); border: 1px solid color-mix(in srgb, var(--ruby) 45%, transparent); border-radius: 8px; padding: 12px; display: grid; gap: 10px }
+
+/* Barre de publication */
+.pub { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; background: var(--panel); border-top: 1px solid var(--gold);
+  padding-block: 12px calc(12px + env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+.pub .in { max-width: 1180px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(80px + env(safe-area-inset-bottom, 0px)); background: var(--hi); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-weight: 800; z-index: 30 }
+pre.json { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; max-height: 360px; overflow: auto; font-size: .78rem; margin: 0 }
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr) }
+  .side { position: sticky; top: env(safe-area-inset-top, 0px); height: auto; z-index: 12; flex-direction: row; align-items: center; padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px)); border-right: 0; border-bottom: 1px solid var(--line) }
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 13; background: var(--raised) }
+  .brand small, .side .foot { display: none }
+  nav { flex-direction: row; overflow-x: auto; min-width: 0 }
+  nav a { white-space: nowrap; padding: 7px 10px }
+  nav a[aria-current="page"] { box-shadow: inset 0 -3px 0 var(--gold) }
+  .grid2, .grid3 { grid-template-columns: minmax(0, 1fr) }
+  main { padding-top: 20px }
+}
+@media (max-width: 520px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)) } .hbar { grid-template-columns: 80px minmax(0, 1fr) 64px } }
+@media (prefers-reduced-motion: no-preference) { .drawer { animation: slide .18s ease-out } @keyframes slide { from { transform: translateX(30px); opacity: .6 } } }
+</style>
+
+<div class="shell">
+  <aside class="side">
+    <div class="brand"><span class="boards" aria-hidden="true"><i></i><i></i><i></i></span><span>Omaha 3 Boards<small>Administration</small></span></div>
+    <nav id="nav" aria-label="Sections">
+      <a href="#tableau">Tableau de bord</a>
+      <a href="#joueurs">Joueurs</a>
+      <a href="#economie">Économie</a>
+      <a href="#ligues">Ligues et classement</a>
+      <a href="#salles">Salles et blindes</a>
+      <a href="#boutique">Boutique</a>
+      <a href="#reglages">Réglages</a>
+    </nav>
+    <div class="foot">
+      <span id="cfgver"></span>
+      <button class="btn ghost small" data-action="reset-demo">Régénérer la démo</button>
+    </div>
+  </aside>
+  <main><div class="wrap" id="view"></div></main>
+</div>
+<div id="overlay"></div>
+<div id="pubbar"></div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+'use strict';
+
+// ---------- Catalogue par défaut : reprend app/lib/state/catalog.dart ----------
+// Les couleurs sont en hex, les prix des packs en centimes. Le serveur publiera ce JSON comme « config distante ».
+const DEFAULT_CONFIG = {
+  version: 1,
+  publishedAt: null,
+  currency: 'EUR',
+  startingCoins: 10000,
+  dailyRewards: [1000, 1500, 2000, 3000, 4000, 6000, 10000],
+  freeGains: { chestEveryHours: 4, chestEveryHoursVip: 2, chestMin: 500, chestMax: 2000, levelUpPerLevel: 500, rescueCoins: 2000, rescueEveryHours: 6 },
+  missionRewards: { hands: 1000, boards: 1500, flush: 2000, scoop: 2500 },
+  rake: { percent: 5, capBigBlinds: 2 },
+  buyInBigBlinds: 50,
+  rooms: [
+    { id: 'debutant', name: 'Débutant', smallBlind: 10, bigBlind: 20, minLevel: 1, leagueMultiplier: 1, color: '#3FD68E', active: true },
+    { id: 'salon', name: 'Salon', smallBlind: 50, bigBlind: 100, minLevel: 3, leagueMultiplier: 2, color: '#55A8FF', active: true },
+    { id: 'club', name: 'Club privé', smallBlind: 200, bigBlind: 400, minLevel: 6, leagueMultiplier: 3, color: '#B57CFF', active: true },
+    { id: 'prestige', name: 'Prestige', smallBlind: 1000, bigBlind: 2000, minLevel: 10, leagueMultiplier: 5, color: '#F6C453', active: true },
+    { id: 'elite', name: 'Élite', smallBlind: 5000, bigBlind: 10000, minLevel: 15, leagueMultiplier: 8, color: '#FF7A6B', active: true },
+    { id: 'legende', name: 'Légende', smallBlind: 25000, bigBlind: 50000, minLevel: 20, leagueMultiplier: 12, color: '#E35DD2', active: true },
+  ],
+  coinPacks: [
+    { id: 'poignee', coins: 25000, priceCents: 199, bonusPercent: 0, tag: '', active: true },
+    { id: 'sacoche', coins: 70000, priceCents: 499, bonusPercent: 12, tag: '', active: true },
+    { id: 'coffret', coins: 160000, priceCents: 999, bonusPercent: 28, tag: 'Populaire', active: true },
+    { id: 'malle', coins: 360000, priceCents: 1999, bonusPercent: 44, tag: '', active: true },
+    { id: 'tresor', coins: 1000000, priceCents: 4999, bonusPercent: 60, tag: 'Meilleure valeur', active: true },
+    { id: 'empire', coins: 2200000, priceCents: 9999, bonusPercent: 76, tag: '', active: true },
+  ],
+  welcomeOffer: { id: 'bienvenue', coins: 60000, priceCents: 99, bonusPercent: 0, tag: 'Une seule fois', active: true },
+  vipPass: { id: 'vip', coins: 50000, priceCents: 499, days: 30, active: true },
+  // Cosmétiques : kind = theme | cardBack | avatar | frame ; owned côté joueur = "kind:id".
+  cosmetics: {
+    themes: [
+      { id: 'vert', kind: 'theme', name: 'Vert classique', price: 0, colors: ['#2E8B57', '#1B5E3A'], pattern: 'none', minLevel: 1, vipOnly: false, active: true },
+      { id: 'minuit', kind: 'theme', name: 'Bleu minuit', price: 60000, colors: ['#2F5E9E', '#173561'], pattern: 'waves', minLevel: 3, vipOnly: false, active: true },
+      { id: 'grenat', kind: 'theme', name: 'Grenat', price: 60000, colors: ['#9E2F3E', '#5E1621'], pattern: 'diamonds', minLevel: 3, vipOnly: false, active: true },
+      { id: 'artdeco', kind: 'theme', name: 'Art déco', price: 250000, colors: ['#1E2A2A', '#0B1212'], pattern: 'artDeco', minLevel: 8, vipOnly: false, active: true },
+      { id: 'galaxie', kind: 'theme', name: 'Galaxie', price: 400000, colors: ['#3A2370', '#120A2B'], pattern: 'stars', minLevel: 12, vipOnly: true, active: true },
+    ],
+    cardBacks: [
+      { id: 'bordeaux', kind: 'cardBack', name: 'Bordeaux', price: 0, colors: ['#8E1B2C', '#5C0F1C'], pattern: 'none', minLevel: 1, vipOnly: false, active: true },
+      { id: 'nuit', kind: 'cardBack', name: 'Nuit étoilée', price: 40000, colors: ['#243B6B', '#0D1730'], pattern: 'stars', minLevel: 2, vipOnly: false, active: true },
+      { id: 'emeraude', kind: 'cardBack', name: 'Émeraude', price: 40000, colors: ['#15805A', '#07402B'], pattern: 'hexagons', minLevel: 2, vipOnly: false, active: true },
+      { id: 'royal', kind: 'cardBack', name: 'Or royal', price: 150000, colors: ['#E2B54A', '#8C5E12'], pattern: 'artDeco', minLevel: 6, vipOnly: false, active: true },
+      { id: 'dragon', kind: 'cardBack', name: 'Écailles de dragon', price: 300000, colors: ['#1F6E5C', '#0A2B24'], pattern: 'scales', minLevel: 10, vipOnly: true, active: true },
+    ],
+    avatars: [
+      { id: 'as', kind: 'avatar', name: 'As de pique', price: 0, colors: ['#55A8FF', '#1F4E8C'], pattern: 'none', minLevel: 1, vipOnly: false, active: true },
+      { id: 'renard', kind: 'avatar', name: 'Renard', price: 20000, colors: ['#E8823A', '#8C3F12'], pattern: 'none', minLevel: 1, vipOnly: false, active: true },
+      { id: 'hibou', kind: 'avatar', name: 'Hibou', price: 20000, colors: ['#8A6FD1', '#3D2A7A'], pattern: 'none', minLevel: 4, vipOnly: false, active: true },
+      { id: 'lion', kind: 'avatar', name: 'Lion', price: 120000, colors: ['#F6C453', '#A8701A'], pattern: 'none', minLevel: 10, vipOnly: false, active: true },
+    ],
+    frames: [
+      { id: 'simple', kind: 'frame', name: 'Simple', price: 0, colors: ['#93A5BF', '#5A6B84'], pattern: 'none', minLevel: 1, vipOnly: false, active: true },
+      { id: 'argent', kind: 'frame', name: 'Argent', price: 50000, colors: ['#E3E8F0', '#8C97A8'], pattern: 'stripes', minLevel: 5, vipOnly: false, active: true },
+      { id: 'or', kind: 'frame', name: 'Or', price: 200000, colors: ['#F6C453', '#A8701A'], pattern: 'stripes', minLevel: 10, vipOnly: false, active: true },
+      { id: 'vip', kind: 'frame', name: 'Couronne VIP', price: 0, colors: ['#E35DD2', '#6B1F63'], pattern: 'diamonds', minLevel: 1, vipOnly: true, active: true },
+    ],
+  },
+  // Points de ligue cumulés pour entrer ; prime hebdo = barème par rang × rewardScale de la ligue.
+  leagues: [
+    { name: 'Bronze', threshold: 0, color: '#CD7F4A', rewardScale: 1 },
+    { name: 'Argent', threshold: 300, color: '#C3CCD8', rewardScale: 3 },
+    { name: 'Or', threshold: 1000, color: '#F6C453', rewardScale: 8 },
+    { name: 'Platine', threshold: 2500, color: '#6FE0D2', rewardScale: 20 },
+    { name: 'Diamant', threshold: 5000, color: '#8FB8FF', rewardScale: 50 },
+    { name: 'Champion', threshold: 10000, color: '#FF7A6B', rewardScale: 120 },
+  ],
+  leagueRankRewards: [
+    { from: 1, to: 1, coins: 5000 },
+    { from: 2, to: 2, coins: 3000 },
+    { from: 3, to: 3, coins: 2000 },
+    { from: 4, to: 10, coins: 1000 },
+    { from: 11, to: 20, coins: 400 },
+  ],
+  announcement: { active: false, text: '' },
+};
+
+const TX_LABEL = { purchase: 'Achat', bonus: 'Bonus quotidien', chest: 'Coffre gratuit', levelup: 'Passage de niveau', rescue: 'Coup de pouce', mission: 'Mission', table: 'Table', rake: 'Commission', league: 'Récompense de ligue', shop: 'Boutique', admin: 'Ajustement admin' };
+const KINDS = [['themes', 'Thèmes de table'], ['cardBacks', 'Dos de cartes'], ['avatars', 'Avatars'], ['frames', 'Cadres']];
+const PATTERNS = ['none', 'diamonds', 'waves', 'artDeco', 'stars', 'hexagons', 'stripes', 'scales'];
+const allCosmetics = cfg => Object.values(cfg.cosmetics).flat();
+const cosKey = c => `${c.kind}:${c.id}`;
+const DAY = 86400000;
+
+// ---------- Outils ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const nf = new Intl.NumberFormat('fr-FR');
+const fmt = n => nf.format(Math.round(n)).replace(/ | /g, ' ');
+const compact = n => n >= 1e6 ? (n / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' M' : n >= 1e3 ? (n / 1e3).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' k' : fmt(n);
+const eur = c => (c / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }).replace(/ | /g, ' ');
+const clone = o => JSON.parse(JSON.stringify(o));
+const dayStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+const ago = t => { const m = (Date.now() - t) / 60000; if (m < 60) return `il y a ${Math.max(1, Math.round(m))} min`; if (m < 1440) return `il y a ${Math.round(m / 60)} h`; return `il y a ${Math.round(m / 1440)} j`; };
+const dateFr = t => new Date(t).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+// Même courbe d'XP que PlayerProfile.xpForLevel.
+const xpForLevel = l => 150 + 75 * (l - 1);
+function levelOf(xp) { let l = 1, r = xp; while (r >= xpForLevel(l)) { r -= xpForLevel(l); l++; } return l; }
+function leagueIndex(lp, leagues) { let i = 0; leagues.forEach((g, k) => { if (lp >= g.threshold) i = k; }); return i; }
+
+// ---------- Données de démonstration ----------
+const NAMES = ['Lucie', 'Marco', 'Inès', 'Hugo', 'Nadia', 'Théo', 'Chloé', 'Samir', 'Jade', 'Louis', 'Emma', 'Yanis', 'Léa', 'Karim', 'Zoé', 'Noah', 'Manon', 'Rayan', 'Camille', 'Enzo', 'Sarah', 'Adam', 'Lina', 'Gabriel', 'Alice', 'Mehdi', 'Clara', 'Lucas', 'Anaïs', 'Bastien', 'Margaux', 'Kylian', 'Océane', 'Julien', 'Fatou', 'Pierre', 'Romane', 'Sofiane'];
+const SUFFIX = ['', '', '', '_pro', '33', '75', '_omaha', 'bluff', '06', 'Ace', '_kk', '69', 'Nuts', '13', '_qc'];
+const COUNTRIES = [['FR', 62], ['BE', 10], ['CH', 7], ['CA', 9], ['MA', 6], ['SN', 3], ['LU', 3]];
+const AV_COLORS = ['#C2563E', '#3E7CC2', '#2E9466', '#8A54C9', '#C28A1E', '#C2407A', '#3A9AA6', '#6D7A8F'];
+
+const CITIES = { FR: ['Paris', 'Lyon', 'Marseille', 'Bordeaux', 'Lille', 'Nantes', 'Toulouse'], BE: ['Bruxelles', 'Liège'], CH: ['Genève', 'Lausanne'], CA: ['Montréal', 'Québec'], MA: ['Casablanca', 'Rabat'], SN: ['Dakar'], LU: ['Luxembourg'] };
+
+function generateDemo() {
+  const r = mulberry32(20261023);
+  const pick = a => a[Math.floor(r() * a.length)];
+  const now = Date.now();
+  const cfg = DEFAULT_CONFIG;
+  const cos = allCosmetics(cfg);
+  const players = [], txs = [];
+  let txId = 1;
+  const add = (p, k, a, t, extra = {}) => txs.push({ id: txId++, p: p.id, k, a, t, ...extra });
+  const packOdds = [0.3, 0.55, 0.8, 0.92, 0.98, 1];
+  for (let i = 0; i < 260; i++) {
+    const age = Math.pow(r(), 0.8) * 140 * DAY;
+    const createdAt = now - age;
+    const a = Math.pow(r(), 1.6); // engagement de 0 à 1
+    const recent = Math.min(age, 45 * DAY);
+    const lastSeenAt = now - Math.pow(r(), 1 + 4 * a) * recent;
+    const hands = Math.floor(a * 3200 * Math.min(1, age / (60 * DAY)) + r() * 30);
+    let country = 'FR', roll = r() * 100;
+    for (const [c, w] of COUNTRIES) { if ((roll -= w) < 0) { country = c; break; } }
+    const name = (pick(NAMES) + pick(SUFFIX)).slice(0, 14);
+    const lp = Math.floor(hands * (1 + r() * 5));
+    const boardsWon = Math.floor(hands * (0.28 + r() * 0.2));
+    const p = {
+      id: 'J' + String(10001 + i), name, avatarId: 'as', avatarUrl: null, frame: 'simple', theme: 'vert', cardBack: 'bordeaux',
+      bio: r() < 0.3 ? pick(['Fan d’Omaha depuis 2019', 'Je rafle les 3 boards', 'Joueur du dimanche', 'Toujours partant pour une partie', 'Objectif : ligue Champion']) : '',
+      country, city: pick(CITIES[country]), birthDate: `${1965 + Math.floor(r() * 40)}-0${1 + Math.floor(r() * 9)}-1${Math.floor(r() * 9)}`,
+      email: r() < 0.7 ? `${name.toLowerCase().replace(/[^a-z0-9]/g, '')}${Math.floor(r() * 99)}@exemple.fr` : '',
+      platform: r() < 0.56 ? 'ios' : 'android', createdAt, lastSeenAt, vipUntil: 0,
+      coins: Math.floor(1500 + r() * a * 400000), xp: hands * 12 + Math.floor(r() * 200),
+      leaguePoints: lp, weeklyPoints: now - lastSeenAt < 7 * DAY ? Math.floor(r() * (60 + lp / 18)) : 0,
+      handsPlayed: hands, boardsWon, potsWon: Math.floor(boardsWon * 0.45), scoops: Math.floor(boardsWon * (0.04 + r() * 0.04)),
+      biggestWin: Math.floor(r() * a * 120000),
+      owned: cos.filter(c => !c.price && !c.vipOnly).map(cosKey), welcomeBought: false,
+      banned: false, banReason: '', avColor: pick(AV_COLORS),
+    };
+    const lvl = levelOf(p.xp);
+    for (const c of cos) if (c.price && lvl >= c.minLevel && !c.vipOnly && r() < a * 0.5) p.owned.push(cosKey(c));
+    const own = k => cos.filter(c => c.kind === k && p.owned.includes(cosKey(c)));
+    p.avatarId = pick(own('avatar')).id; p.theme = pick(own('theme')).id; p.cardBack = pick(own('cardBack')).id; p.frame = pick(own('frame')).id;
+    if (r() < 0.012 + a * 0.03) { p.banned = true; p.banReason = pick(['Pseudo injurieux', 'Collusion à la table', 'Multi-comptes']); }
+    players.push(p);
+
+    // Journal des 30 derniers jours.
+    const from = Math.max(createdAt, now - 30 * DAY);
+    if (lastSeenAt < from) continue;
+    const span = lastSeenAt - from;
+    const days = Math.max(1, Math.round(a * 22 * span / (30 * DAY)));
+    for (let d = 0; d < days; d++) {
+      const t = from + r() * span;
+      add(p, 'bonus', cfg.dailyRewards[Math.floor(r() * 7)], t);
+      const chests = 1 + Math.floor(r() * 3 * a);
+      for (let c = 0; c < chests; c++) add(p, 'chest', cfg.freeGains.chestMin + Math.floor(r() * (cfg.freeGains.chestMax - cfg.freeGains.chestMin)), t + 4 * 3600e3 * c);
+      if (r() < 0.6) add(p, 'mission', pick(Object.values(cfg.missionRewards)), t + 3600e3 * r());
+      const stake = 2000 * (1 + a * 10);
+      add(p, 'table', Math.round((r() - 0.5) * 3 * stake), t + 7200e3 * r());
+      add(p, 'rake', -Math.round(stake * 0.05 * (0.5 + r())), t + 7200e3 * r());
+      if (r() < 0.12) add(p, 'levelup', cfg.freeGains.levelUpPerLevel * Math.max(2, lvl - Math.floor(r() * 3)), t + 1800e3);
+      if (a < 0.2 && r() < 0.15) add(p, 'rescue', cfg.freeGains.rescueCoins, t + 900e3);
+    }
+    if (r() < 0.05 + a * 0.35) {
+      const n = 1 + Math.floor(r() * (1 + a * 4));
+      for (let k = 0; k < n; k++) {
+        const w = r(), t = from + r() * span;
+        let pack = cfg.coinPacks[packOdds.findIndex(o => w < o)];
+        if (!p.welcomeBought && r() < 0.4) { pack = cfg.welcomeOffer; p.welcomeBought = true; }
+        else if (r() < 0.2) { pack = cfg.vipPass; p.vipUntil = Math.max(p.vipUntil, t + cfg.vipPass.days * DAY); }
+        add(p, 'purchase', pack.coins, t, { c: pack.priceCents, pack: pack.id, store: p.platform === 'ios' ? 'App Store' : 'Google Play' });
+      }
+    }
+    for (const key of p.owned) {
+      const c = cos.find(x => cosKey(x) === key);
+      if (c && c.price && r() < 0.5) add(p, 'shop', -c.price, from + r() * span, { item: c.name });
+    }
+  }
+  txs.sort((x, y) => y.t - x.t);
+  return { config: clone(cfg), draft: clone(cfg), players, txs, weeks: [], nextTx: txId };
+}
+
+// ---------- Stockage local (démo) ----------
+const KEY = 'omaha-admin-demo-v2';
+let S;
+function load() {
+  try { const raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); return; } } catch (_) {}
+  S = generateDemo();
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (_) {} }
+
+// ---------- Calculs ----------
+const byId = id => S.players.find(p => p.id === id);
+const spentCents = id => S.txs.reduce((s, t) => s + (t.p === id && t.k === 'purchase' ? t.c : 0), 0);
+function last30Days() {
+  const today = dayStart(Date.now());
+  return Array.from({ length: 30 }, (_, i) => today - (29 - i) * DAY);
+}
+function dailySeries() {
+  const days = last30Days(), idx = new Map(days.map((d, i) => [d, i]));
+  const active = days.map(() => new Set()), revenue = days.map(() => 0);
+  for (const t of S.txs) {
+    const i = idx.get(dayStart(t.t));
+    if (i === undefined) continue;
+    active[i].add(t.p);
+    if (t.k === 'purchase') revenue[i] += t.c;
+  }
+  const label = d => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+  return { labels: days.map(label), dau: active.map(s => s.size), revenue };
+}
+
+// ---------- Graphique en barres ----------
+function niceMax(m) { if (m <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(m))); for (const k of [1, 2, 2.5, 5, 10]) if (k * p >= m) return k * p; return 10 * p; }
+function barChart(vals, labels, format, alt) {
+  const W = 640, H = 210, L = 58, R = 8, T = 12, B = 28, iw = W - L - R, ih = H - T - B;
+  const max = niceMax(Math.max(...vals)), bw = iw / vals.length;
+  let s = `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Graphique sur 30 jours">`;
+  for (let i = 0; i <= 4; i++) {
+    const y = T + ih - ih * i / 4;
+    s += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" class="grid"/><text x="${L - 8}" y="${y + 4}" class="ax" text-anchor="end">${format(max * i / 4)}</text>`;
+  }
+  vals.forEach((v, i) => {
+    const h = Math.max(v > 0 ? 1.5 : 0, ih * v / max);
+    s += `<rect x="${(L + i * bw + bw * 0.16).toFixed(1)}" y="${(T + ih - h).toFixed(1)}" width="${(bw * 0.68).toFixed(1)}" height="${h.toFixed(1)}" rx="2" class="bar${alt ? ' alt' : ''}${i === vals.length - 1 ? ' now' : ''}"><title>${labels[i]} : ${format(v)}</title></rect>`;
+    if (i % 7 === 1 || i === vals.length - 1) s += `<text x="${(L + i * bw + bw / 2).toFixed(1)}" y="${H - 9}" class="ax" text-anchor="middle">${labels[i]}</text>`;
+  });
+  return s + '</svg>';
+}
+function hbars(rows, max) {
+  return `<div class="hbars">${rows.map(r => `<div class="hbar"><span>${r.label}</span><div class="track"><div class="fill" style="width:${max ? (100 * r.value / max).toFixed(1) : 0}%;background:${r.color}"></div></div><span class="v">${r.text ?? fmt(r.value)}</span></div>`).join('')}</div>`;
+}
+
+// ---------- Morceaux d'interface ----------
+const avatar = p => `<span class="av" style="background:${p.avColor}" aria-hidden="true">${esc(p.name[0].toUpperCase())}</span>`;
+function leaguePill(lp, cfg = S.config) { const g = cfg.leagues[leagueIndex(lp, cfg.leagues)]; return `<span class="pill"><i style="background:${g.color}"></i>${esc(g.name)}</span>`; }
+const kpi = (label, value, note = '', cls = '') => `<div class="kpi ${cls}"><span>${label}</span><b>${value}</b><em>${note}</em></div>`;
+const head = (title, sub) => `<div class="head"><div><h1>${title}</h1><p>${sub}</p></div><span class="demo">Données de démonstration</span></div>`;
+// Champ lié à la config en brouillon : data-path = chemin dans S.draft.
+function field(path, type = 'number', cls = '') {
+  const v = path.split('.').reduce((o, k) => o?.[k], S.draft);
+  if (Array.isArray(type)) return `<select id="f-${path}" class="${cls}" data-path="${path}" aria-label="${path}">${type.map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
+  if (type === 'checkbox') return `<input type="checkbox" id="f-${path}" data-path="${path}" ${v ? 'checked' : ''} aria-label="${path}">`;
+  return `<input type="${type}" id="f-${path}" class="${cls}" data-path="${path}" value="${esc(v)}" ${type === 'number' ? 'min="0" step="1"' : ''} aria-label="${path}">`;
+}
+
+// ---------- Vues ----------
+const VIEWS = {};
+
+VIEWS.tableau = () => {
+  const now = Date.now(), ps = S.players;
+  const d1 = ps.filter(p => now - p.lastSeenAt < DAY).length, d7 = ps.filter(p => now - p.lastSeenAt < 7 * DAY).length;
+  const new7 = ps.filter(p => now - p.createdAt < 7 * DAY).length;
+  const s = dailySeries();
+  const rev7 = s.revenue.slice(-7).reduce((a, b) => a + b, 0), rev30 = s.revenue.reduce((a, b) => a + b, 0);
+  const circ = ps.reduce((a, p) => a + p.coins, 0);
+  const recent = S.txs.slice(0, 9);
+  const spend = new Map(); for (const t of S.txs) if (t.k === 'purchase') spend.set(t.p, (spend.get(t.p) || 0) + t.c);
+  const top = [...spend].sort((a, b) => b[1] - a[1]).slice(0, 6);
+  return head('Tableau de bord', `${fmt(ps.length)} joueurs inscrits · config v${S.config.version}${S.config.publishedAt ? ' publiée le ' + dateFr(S.config.publishedAt) : ' (catalogue de l’app)'}`) +
+    `<div class="kpis">
+      ${kpi('Actifs 24 h', fmt(d1), `${fmt(d7)} sur 7 jours`)}
+      ${kpi('Nouveaux joueurs', fmt(new7), 'sur 7 jours')}
+      ${kpi('Revenus 7 jours', eur(rev7), `${eur(rev30)} sur 30 jours`, 'gold')}
+      ${kpi('Pièces en circulation', compact(circ), `${fmt(circ / Math.max(1, ps.length))} par joueur`)}
+      ${kpi('Comptes bannis', fmt(ps.filter(p => p.banned).length), 'modération')}
+    </div>
+    <div class="grid2">
+      <section class="box"><header><h2>Joueurs actifs par jour</h2><p>30 derniers jours</p></header>${barChart(s.dau, s.labels, v => fmt(v), true)}</section>
+      <section class="box"><header><h2>Revenus par jour</h2><p>achats App Store et Google Play</p></header>${barChart(s.revenue, s.labels, v => compact(v / 100) + ' €')}</section>
+    </div>
+    <div class="grid3">
+      <section class="box"><header><h2>Dernières opérations</h2><a href="#economie" class="small muted">Tout le journal</a></header>
+        <div class="scroll"><table><tbody>${recent.map(txRow).join('')}</tbody></table></div></section>
+      <section class="box"><header><h2>Meilleurs acheteurs</h2><p>30 jours</p></header>
+        <div class="list">${top.map(([id, c]) => { const p = byId(id); return `<div><span class="who" style="cursor:pointer" data-action="open-player" data-id="${id}">${avatar(p)}${esc(p.name)}</span><b class="num">${eur(c)}</b></div>`; }).join('')}</div></section>
+    </div>`;
+};
+
+function txRow(t) {
+  const p = byId(t.p);
+  const detail = t.k === 'purchase' ? `${esc(t.pack)} · ${eur(t.c)} · ${t.store}` : t.k === 'shop' ? esc(t.item) : esc(t.note || '');
+  return `<tr class="click" data-action="open-player" data-id="${t.p}"><td><span class="who">${avatar(p)}${esc(p.name)}</span></td><td>${TX_LABEL[t.k]}</td><td class="muted small">${detail}</td><td class="n ${t.a >= 0 ? 'plus' : 'minus'}">${t.a >= 0 ? '+' : ''}${fmt(t.a)}</td><td class="n muted small">${ago(t.t)}</td></tr>`;
+}
+
+// Joueurs
+const UI = { q: '', filter: 'tous', sort: 'lastSeen', page: 0, league: -1, ledger: 'tous', shopTab: 'packs', confirm: null };
+VIEWS.joueurs = () => {
+  return head('Joueurs', 'Recherche, fiche, pièces et modération') +
+    `<section class="box">
+      <div class="tools">
+        <input type="search" id="q" placeholder="Pseudo ou identifiant (J10042)" value="${esc(UI.q)}" aria-label="Rechercher un joueur">
+        <select id="filter" aria-label="Filtre">${[['tous', 'Tous'], ['actifs', 'Actifs 7 jours'], ['payeurs', 'Payeurs'], ['vip', 'VIP'], ['bannis', 'Bannis'], ['nouveaux', 'Nouveaux 7 jours']].map(([v, l]) => `<option value="${v}" ${UI.filter === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <select id="sort" aria-label="Tri">${[['lastSeen', 'Vus récemment'], ['coins', 'Plus de pièces'], ['lp', 'Points de ligue'], ['hands', 'Mains jouées'], ['spent', 'Plus dépensé'], ['created', 'Inscrits récemment']].map(([v, l]) => `<option value="${v}" ${UI.sort === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      </div>
+      <div id="plist"></div>
+    </section>`;
+};
+function playerList() {
+  const now = Date.now(), q = UI.q.trim().toLowerCase();
+  const spent = new Map(); for (const t of S.txs) if (t.k === 'purchase') spent.set(t.p, (spent.get(t.p) || 0) + t.c);
+  let rows = S.players.filter(p => !q || p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q));
+  rows = rows.filter(p => ({ tous: true, actifs: now - p.lastSeenAt < 7 * DAY, payeurs: spent.has(p.id), vip: p.vipUntil > now, bannis: p.banned, nouveaux: now - p.createdAt < 7 * DAY })[UI.filter]);
+  const key = { lastSeen: p => p.lastSeenAt, coins: p => p.coins, lp: p => p.leaguePoints, hands: p => p.handsPlayed, spent: p => spent.get(p.id) || 0, created: p => p.createdAt }[UI.sort];
+  rows.sort((a, b) => key(b) - key(a));
+  const per = 25, pages = Math.max(1, Math.ceil(rows.length / per));
+  UI.page = Math.min(UI.page, pages - 1);
+  const slice = rows.slice(UI.page * per, UI.page * per + per);
+  $('#plist').innerHTML = `<div class="scroll"><table>
+    <thead><tr><th>Joueur</th><th>Ligue</th><th class="n">Niveau</th><th class="n">Pièces</th><th class="n">Mains</th><th class="n">Dépensé</th><th>Pays</th><th>Vu</th><th>Statut</th></tr></thead>
+    <tbody>${slice.map(p => `<tr class="click" data-action="open-player" data-id="${p.id}">
+      <td><span class="who">${avatar(p)}<span>${esc(p.name)}<br><span class="muted small">${p.id}</span></span></span></td>
+      <td>${leaguePill(p.leaguePoints)}</td><td class="n">${levelOf(p.xp)}</td><td class="n">${fmt(p.coins)}</td><td class="n">${fmt(p.handsPlayed)}</td>
+      <td class="n">${spent.has(p.id) ? eur(spent.get(p.id)) : '<span class="muted">0</span>'}</td><td>${p.country} · ${p.platform === 'ios' ? 'iOS' : 'Android'}</td><td class="muted small">${ago(p.lastSeenAt)}</td>
+      <td>${p.banned ? '<span class="pill bad">Banni</span>' : p.vipUntil > now ? '<span class="pill warn">VIP</span>' : now - p.lastSeenAt < DAY ? '<span class="pill ok">En ligne aujourd’hui</span>' : '<span class="pill">Actif</span>'}</td></tr>`).join('') || '<tr><td colspan="9" class="muted">Aucun joueur ne correspond à cette recherche.</td></tr>'}</tbody></table></div>
+    <div class="tools" style="justify-content:space-between"><span class="muted small">${fmt(rows.length)} joueurs · page ${UI.page + 1} sur ${pages}</span>
+      <span class="tools"><button class="btn" data-action="page" data-d="-1" ${UI.page === 0 ? 'disabled' : ''}>Précédent</button><button class="btn" data-action="page" data-d="1" ${UI.page >= pages - 1 ? 'disabled' : ''}>Suivant</button></span></div>`;
+}
+
+// Fiche joueur
+let openId = null;
+function renderDrawer() {
+  const box = $('#overlay');
+  if (!openId) { box.innerHTML = ''; return; }
+  const p = byId(openId), cfg = S.config;
+  const txs = S.txs.filter(t => t.p === p.id);
+  const spent = txs.reduce((s, t) => s + (t.k === 'purchase' ? t.c : 0), 0);
+  const owned = allCosmetics(cfg).filter(c => p.owned.includes(cosKey(c))).map(c => esc(c.name)).join(', ');
+  const cname = (k, id) => esc(cfg.cosmetics[k].find(c => c.id === id)?.name ?? id);
+  const vip = p.vipUntil > Date.now();
+  box.innerHTML = `<div class="scrim" data-action="close-player"></div>
+  <aside class="drawer" role="dialog" aria-modal="true" aria-label="Fiche de ${esc(p.name)}">
+    <div class="top">${avatar(p)}<div style="flex:1;min-width:0"><h2>${esc(p.name)}</h2><div class="muted small">${p.id} · ${p.country} · ${p.platform === 'ios' ? 'iOS' : 'Android'} · inscrit le ${dateFr(p.createdAt)}</div>
+      <div class="tools" style="margin-top:6px">${leaguePill(p.leaguePoints)}${p.banned ? `<span class="pill bad">Banni : ${esc(p.banReason)}</span>` : ''}${vip ? `<span class="pill warn">VIP jusqu’au ${dateFr(p.vipUntil)}</span>` : ''}${p.welcomeBought ? '<span class="pill">Offre de bienvenue achetée</span>' : ''}</div></div>
+      <button class="btn ghost" data-action="close-player" aria-label="Fermer">Fermer</button></div>
+    <div class="stats">
+      <div><span>Pièces</span><b>${fmt(p.coins)}</b></div><div><span>Niveau</span><b>${levelOf(p.xp)}</b></div><div><span>Points de ligue</span><b>${fmt(p.leaguePoints)}</b></div>
+      <div><span>Mains</span><b>${fmt(p.handsPlayed)}</b></div><div><span>Boards gagnés</span><b>${fmt(p.boardsWon)}</b></div><div><span>Plus gros gain</span><b>${fmt(p.biggestWin)}</b></div>
+      <div><span>Pots gagnés</span><b>${fmt(p.potsWon)}</b></div><div><span>Rafles 3 boards</span><b>${fmt(p.scoops)}</b></div><div><span>Semaine</span><b>${fmt(p.weeklyPoints)} pts</b></div>
+      <div><span>Dépensé 30 j</span><b>${eur(spent)}</b></div><div><span>Vu</span><b style="font-size:.95rem">${ago(p.lastSeenAt)}</b></div><div><span>Âge</span><b>${p.birthDate ? Math.floor((Date.now() - new Date(p.birthDate)) / (365.25 * DAY)) + ' ans' : '–'}</b></div>
+    </div>
+    <section class="box"><h3>Profil « Mon compte »</h3><div class="list small">
+      <div><span class="muted">E-mail</span><span>${esc(p.email) || '<span class="muted">non renseigné</span>'}</span></div>
+      <div><span class="muted">Ville</span><span>${esc(p.city)}, ${p.country}</span></div>
+      <div><span class="muted">Bio</span><span style="white-space:normal;text-align:right">${esc(p.bio) || '<span class="muted">vide</span>'}</span></div>
+      <div><span class="muted">Avatar · cadre</span><span>${p.avatarUrl ? 'Photo personnelle' : cname('avatars', p.avatarId)} · ${cname('frames', p.frame)}</span></div>
+      <div><span class="muted">Thème · dos de cartes</span><span>${cname('themes', p.theme)} · ${cname('cardBacks', p.cardBack)}</span></div>
+      <div><span class="muted">Cosmétiques possédés</span><span style="white-space:normal;text-align:right">${owned || 'aucun'}</span></div></div>
+      <div class="formrow">${p.avatarUrl ? '<button class="btn" data-action="clear-photo">Retirer la photo (modération)</button>' : ''}${p.bio ? '<button class="btn" data-action="clear-bio">Effacer la bio</button>' : ''}<button class="btn" data-action="grant-vip">${vip ? 'Prolonger le VIP de 30 jours' : 'Offrir 30 jours de VIP'}</button></div></section>
+    <section class="box"><h3>Ajuster les pièces</h3>
+      <form class="formrow" data-form="coins"><input type="number" id="adj-amount" name="amount" placeholder="+5000 ou -2000" style="width:130px" min="-100000000" step="1" required aria-label="Montant">
+        <input type="text" id="adj-reason" name="reason" placeholder="Motif (geste commercial, bug…)" required aria-label="Motif"><button class="btn primary">Appliquer</button></form>
+      <span class="muted small">L’opération apparaît dans le journal sous « Ajustement admin ».</span></section>
+    <section class="box"><h3>Pseudo</h3>
+      <form class="formrow" data-form="rename"><input type="text" id="ren-name" name="name" maxlength="14" value="${esc(p.name)}" aria-label="Pseudo"><button class="btn">Renommer</button></form></section>
+    <section class="box"><h3>Modération</h3>
+      ${p.banned ? `<div class="formrow"><span>Banni pour « ${esc(p.banReason)} ».</span><button class="btn" data-action="unban">Lever le bannissement</button></div>`
+      : UI.confirm === 'ban' ? `<form class="confirm" data-form="ban"><b>Bannir ${esc(p.name)} ?</b><span class="small">Le joueur ne pourra plus se connecter ni rejoindre une table. Vous pourrez lever le bannissement ensuite.</span>
+          <input type="text" id="ban-reason" name="reason" placeholder="Motif visible dans la fiche" required aria-label="Motif du bannissement"><div class="formrow"><button class="btn danger">Bannir</button><button type="button" class="btn ghost" data-action="cancel-confirm">Annuler</button></div></form>`
+      : `<div class="formrow"><button class="btn danger" data-action="ask-ban">Bannir ce joueur…</button></div>`}</section>
+    <section class="box"><h3>Journal du joueur</h3><div class="scroll"><table><tbody>${txs.slice(0, 25).map(t => `<tr><td>${TX_LABEL[t.k]}</td><td class="muted small">${t.k === 'purchase' ? `${esc(t.pack)} · ${eur(t.c)}` : esc(t.note || t.item || '')}</td><td class="n ${t.a >= 0 ? 'plus' : 'minus'}">${t.a >= 0 ? '+' : ''}${fmt(t.a)}</td><td class="n muted small">${ago(t.t)}</td></tr>`).join('') || '<tr><td class="muted">Aucune opération sur 30 jours.</td></tr>'}</tbody></table></div></section>
+  </aside>`;
+}
+
+// Économie
+VIEWS.economie = () => {
+  const totals = {}; let rev = 0, buyers = new Set(), count = 0;
+  for (const t of S.txs) {
+    const key = t.k + (t.a >= 0 ? '+' : '-');
+    totals[key] = (totals[key] || 0) + t.a;
+    if (t.k === 'purchase') { rev += t.c; buyers.add(t.p); count++; }
+  }
+  const src = Object.entries(totals).filter(([, v]) => v > 0).map(([k, v]) => ({ label: TX_LABEL[k.slice(0, -1)] + (k.startsWith('table') ? ' (gains)' : ''), value: v, color: 'var(--mint)' })).sort((a, b) => b.value - a.value);
+  const sink = Object.entries(totals).filter(([, v]) => v < 0).map(([k, v]) => ({ label: TX_LABEL[k.slice(0, -1)] + (k.startsWith('table') ? ' (pertes)' : ''), value: -v, color: 'var(--ruby)' })).sort((a, b) => b.value - a.value);
+  const inSum = src.reduce((a, r) => a + r.value, 0), outSum = sink.reduce((a, r) => a + r.value, 0);
+  const max = Math.max(...src.map(r => r.value), ...sink.map(r => r.value));
+  const circ = S.players.reduce((a, p) => a + p.coins, 0);
+  const packs = [...S.config.coinPacks, S.config.welcomeOffer, S.config.vipPass].map(pk => { const ts = S.txs.filter(t => t.pack === pk.id); return { label: pk.id, value: ts.reduce((a, t) => a + t.c, 0), n: ts.length }; });
+  const pmax = Math.max(...packs.map(x => x.value));
+  const kinds = ['tous', 'purchase', 'bonus', 'chest', 'mission', 'table', 'rake', 'league', 'shop', 'admin'];
+  const ledger = S.txs.filter(t => UI.ledger === 'tous' || t.k === UI.ledger).slice(0, 40);
+  return head('Économie', 'Pièces créées et détruites, achats intégrés, journal des 30 derniers jours') +
+    `<div class="kpis">
+      ${kpi('Revenus 30 jours', eur(rev), `${fmt(count)} achats`, 'gold')}
+      ${kpi('Payeurs', fmt(buyers.size), `${(100 * buyers.size / S.players.length).toFixed(1).replace('.', ',')} % des joueurs`)}
+      ${kpi('Panier moyen', eur(rev / Math.max(1, count)), `${eur(rev / Math.max(1, buyers.size))} par payeur`)}
+      ${kpi('Pièces en circulation', compact(circ), 'solde total des joueurs')}
+      ${kpi('Création nette 30 j', (inSum - outSum >= 0 ? '+' : '') + compact(inSum - outSum), 'pièces entrées moins sorties')}
+    </div>
+    <div class="grid2">
+      <section class="box"><header><h2>Sources de pièces</h2><p>${compact(inSum)} créées</p></header>${hbars(src.map(r => ({ ...r, text: compact(r.value) })), max)}</section>
+      <section class="box"><header><h2>Dépenses de pièces</h2><p>${compact(outSum)} retirées</p></header>${hbars(sink.map(r => ({ ...r, text: compact(r.value) })), max)}
+        <p class="muted small" style="margin:0">Les gains et pertes à table s’équilibrent entre joueurs ; contre les bots, l’écart crée ou détruit des pièces. La commission (${S.config.rake.percent} %, plafond ${S.config.rake.capBigBlinds} grosses blindes) retire des pièces du jeu à chaque pot gagné après le flop.</p></section>
+    </div>
+    <section class="box"><header><h2>Ventes par pack</h2><p>revenus 30 jours</p></header>${hbars(packs.map(x => ({ label: x.label, value: x.value, text: eur(x.value), color: 'var(--gold)' })), pmax)}</section>
+    <section class="box"><header><h2>Journal</h2><div class="seg" role="group" aria-label="Type d’opération">${kinds.map(k => `<button data-action="ledger" data-k="${k}" aria-pressed="${UI.ledger === k}">${k === 'tous' ? 'Tout' : TX_LABEL[k]}</button>`).join('')}</div></header>
+      <div class="scroll"><table><tbody>${ledger.map(txRow).join('') || '<tr><td class="muted">Aucune opération de ce type.</td></tr>'}</tbody></table></div></section>`;
+};
+
+// Ligues et classement
+const rankReward = (rank, cfg) => cfg.leagueRankRewards.find(b => rank >= b.from && rank <= b.to)?.coins ?? 0;
+// Primes de fin de semaine : chaque ligue classe ses joueurs actifs de la semaine, barème par rang × rewardScale.
+function weekPayouts(cfg = S.config) {
+  const L = cfg.leagues, out = [];
+  L.forEach((g, i) => {
+    const ranked = S.players.filter(p => !p.banned && p.weeklyPoints > 0 && leagueIndex(p.leaguePoints, L) === i).sort((a, b) => b.weeklyPoints - a.weeklyPoints);
+    ranked.forEach((p, k) => { const c = rankReward(k + 1, cfg) * g.rewardScale; if (c) out.push({ p, league: g, rank: k + 1, coins: c }); });
+  });
+  return out;
+}
+VIEWS.ligues = () => {
+  const cfg = S.config, L = cfg.leagues;
+  const counts = L.map(() => 0); for (const p of S.players) counts[leagueIndex(p.leaguePoints, L)]++;
+  const cmax = Math.max(...counts);
+  const pool = S.players.filter(p => !p.banned && (UI.league < 0 || leagueIndex(p.leaguePoints, L) === UI.league));
+  const weekly = UI.league >= 0;
+  pool.sort((a, b) => weekly ? b.weeklyPoints - a.weeklyPoints || b.leaguePoints - a.leaguePoints : b.leaguePoints - a.leaguePoints);
+  const rank = pool.slice(0, 50);
+  const pay = weekPayouts(), total = pay.reduce((a, x) => a + x.coins, 0);
+  const d = S.draft;
+  return head('Ligues et classement', 'Seuils, primes hebdomadaires par rang et classement complet des joueurs') +
+    `<div class="grid2">
+      <section class="box"><header><h2>Joueurs par ligue</h2><p>selon les points de ligue cumulés</p></header>${hbars(L.map((g, i) => ({ label: esc(g.name), value: counts[i], color: g.color })), cmax)}
+        <h3>Barème par rang (avant multiplicateur)</h3>
+        <div class="scroll"><table><thead><tr><th class="n">Du rang</th><th class="n">au rang</th><th class="n">Pièces</th></tr></thead><tbody>
+        ${d.leagueRankRewards.map((b, i) => `<tr><td class="n">${field(`leagueRankRewards.${i}.from`, 'number', 'w-s')}</td><td class="n">${field(`leagueRankRewards.${i}.to`, 'number', 'w-s')}</td><td class="n">${field(`leagueRankRewards.${i}.coins`)}</td></tr>`).join('')}
+        </tbody></table></div></section>
+      <section class="box"><header><h2>Réglage des ligues</h2><p>modifications publiées avec la config</p></header>
+        <div class="scroll"><table><thead><tr><th>Ligue</th><th>Couleur</th><th class="n">Seuil (pts)</th><th class="n">Multiplicateur</th><th class="n">Prime du 1er</th></tr></thead><tbody>
+        ${d.leagues.map((g, i) => `<tr><td>${field(`leagues.${i}.name`, 'text', 'w-m')}</td><td>${field(`leagues.${i}.color`, 'color')}</td><td class="n">${field(`leagues.${i}.threshold`)}</td><td class="n">${field(`leagues.${i}.rewardScale`, 'number', 'w-s')}</td><td class="n muted">${fmt(rankReward(1, d) * g.rewardScale)}</td></tr>`).join('')}
+        </tbody></table></div></section>
+    </div>
+    <section class="box"><header><h2>Fin de semaine</h2><p>primes versées aux 20 premiers de chaque ligue, puis les points de la semaine repartent à zéro</p></header>
+      <div class="scroll"><table><thead><tr><th>Ligue</th><th>Vainqueur</th><th class="n">Points</th><th class="n">Joueurs primés</th><th class="n">Pièces versées</th></tr></thead><tbody>${L.map(g => { const rows = pay.filter(x => x.league === g), w = rows[0]; return `<tr><td>${leaguePill(g.threshold)}</td><td>${w ? `<span class="who">${avatar(w.p)}${esc(w.p.name)}</span>` : '<span class="muted">Personne n’a joué</span>'}</td><td class="n">${w ? fmt(w.p.weeklyPoints) : ''}</td><td class="n">${fmt(rows.length)}</td><td class="n plus">${rows.length ? '+' + fmt(rows.reduce((a, x) => a + x.coins, 0)) : ''}</td></tr>`; }).join('')}</tbody></table></div>
+      ${UI.confirm === 'week' ? `<div class="confirm"><b>Clôturer la semaine et verser ${fmt(total)} pièces à ${fmt(pay.length)} joueurs ?</b><span class="small">Les points de la semaine de tous les joueurs repartent à zéro. Cette opération ne s’annule pas.</span><div class="formrow"><button class="btn primary" data-action="close-week">Verser et clôturer</button><button class="btn ghost" data-action="cancel-confirm">Annuler</button></div></div>`
+      : `<div class="formrow"><button class="btn primary" data-action="ask-week">Clôturer la semaine…</button><span class="muted small">${S.weeks.length ? `Dernière clôture le ${dateFr(S.weeks[0].t)} : ${fmt(S.weeks[0].total)} pièces versées.` : 'Le serveur clôturera chaque lundi à 0 h ; ce bouton sert à le faire à la main.'}</span></div>`}
+    </section>
+    <section class="box"><header><h2>Classement</h2><div class="seg" role="group" aria-label="Ligue">
+      <button data-action="league" data-i="-1" aria-pressed="${UI.league < 0}">Général</button>${L.map((g, i) => `<button data-action="league" data-i="${i}" aria-pressed="${UI.league === i}">${esc(g.name)}</button>`).join('')}</div></header>
+      <p class="muted small" style="margin:0">${weekly ? `Classement de la semaine en ${esc(L[UI.league].name)} : ${fmt(pool.length)} joueurs.` : `Classement général par points de ligue cumulés : ${fmt(pool.length)} joueurs, bannis exclus.`}</p>
+      <div class="scroll"><table><thead><tr><th class="n">#</th><th>Joueur</th><th>Ligue</th><th class="n">${weekly ? 'Points semaine' : 'Points de ligue'}</th>${weekly ? '<th class="n">Prime</th>' : ''}<th class="n">Niveau</th><th class="n">Mains</th><th class="n">Pots gagnés</th><th class="n">Rafles</th><th class="n">Pièces</th></tr></thead><tbody>
+      ${rank.map((p, i) => `<tr class="click" data-action="open-player" data-id="${p.id}"><td class="n"><b>${i + 1}</b></td><td><span class="who">${avatar(p)}${esc(p.name)}</span></td><td>${leaguePill(p.leaguePoints)}</td><td class="n"><b>${fmt(weekly ? p.weeklyPoints : p.leaguePoints)}</b></td>${weekly ? `<td class="n plus">${p.weeklyPoints ? (rankReward(i + 1, cfg) ? '+' + fmt(rankReward(i + 1, cfg) * L[UI.league].rewardScale) : '') : ''}</td>` : ''}<td class="n">${levelOf(p.xp)}</td><td class="n">${fmt(p.handsPlayed)}</td><td class="n">${fmt(p.potsWon)}</td><td class="n">${fmt(p.scoops)}</td><td class="n">${fmt(p.coins)}</td></tr>`).join('')}
+      </tbody></table></div></section>`;
+};
+
+// Salles
+VIEWS.salles = () => {
+  const d = S.draft, base = d.coinPacks[0];
+  const perEuro = base.coins / (base.priceCents / 100);
+  const lv = S.players.map(p => levelOf(p.xp));
+  const warn = [];
+  d.rooms.forEach(r => {
+    if (+r.smallBlind >= +r.bigBlind) warn.push(['e', `${r.name} : la petite blinde doit être plus petite que la grosse.`]);
+    const cave = r.bigBlind * d.buyInBigBlinds;
+    if (cave > d.startingCoins * 4 && r.minLevel <= 2) warn.push(['w', `${r.name} : cave de ${fmt(cave)} pièces accessible dès le niveau ${r.minLevel}, alors qu’un nouveau joueur a ${fmt(d.startingCoins)} pièces.`]);
+  });
+  if (!warn.length) warn.push(['', 'Blindes et caves cohérentes avec les pièces de départ.']);
+  return head('Salles et blindes', 'Les tables proposées, leurs blindes, le niveau requis et le bonus de points de ligue') +
+    `<section class="box"><header><h2>Salles</h2><p>cave = ${field('buyInBigBlinds', 'number', 'w-s')} grosses blindes</p></header>
+      <div class="scroll"><table><thead><tr><th>Nom</th><th>Couleur</th><th class="n">Petite blinde</th><th class="n">Grosse blinde</th><th class="n">Cave</th><th class="n">≈ prix réel</th><th class="n">Niveau min.</th><th class="n">× points ligue</th><th class="n">Joueurs éligibles</th><th>Ouverte</th><th></th></tr></thead><tbody>
+      ${d.rooms.map((r, i) => { const cave = r.bigBlind * d.buyInBigBlinds; return `<tr><td>${field(`rooms.${i}.name`, 'text', 'w-m')}</td><td>${field(`rooms.${i}.color`, 'color')}</td><td class="n">${field(`rooms.${i}.smallBlind`)}</td><td class="n">${field(`rooms.${i}.bigBlind`)}</td><td class="n"><b>${fmt(cave)}</b></td><td class="n muted">${eur(100 * cave / perEuro)}</td><td class="n">${field(`rooms.${i}.minLevel`, 'number', 'w-s')}</td><td class="n">${field(`rooms.${i}.leagueMultiplier`, 'number', 'w-s')}</td><td class="n">${fmt(lv.filter(l => l >= r.minLevel).length)}</td><td>${field(`rooms.${i}.active`, 'checkbox')}</td><td><button class="btn ghost small" data-action="del-room" data-i="${i}">Retirer</button></td></tr>`; }).join('')}
+      </tbody></table></div>
+      <div class="formrow"><button class="btn" data-action="add-room">Ajouter une salle</button><span class="muted small">« ≈ prix réel » : la cave au tarif du plus petit pack (${fmt(perEuro)} pièces par euro).</span></div></section>
+    <section class="box"><header><h2>Commission</h2><p>prélevée sur chaque pot gagné après le flop ; elle retire des pièces du jeu</p></header>
+      <div class="formrow"><label for="f-rake.percent">Pourcentage du pot</label>${field('rake.percent', 'number', 'w-s')}<label for="f-rake.capBigBlinds">Plafond en grosses blindes</label>${field('rake.capBigBlinds', 'number', 'w-s')}</div>
+      <span class="muted small">Exemple en ${esc(d.rooms[1]?.name ?? '')} : pot de ${fmt((d.rooms[1]?.bigBlind ?? 100) * 30)} pièces, commission ${fmt(Math.min((d.rooms[1]?.bigBlind ?? 100) * 30 * d.rake.percent / 100, (d.rooms[1]?.bigBlind ?? 100) * d.rake.capBigBlinds))} pièces.</span></section>
+    <section class="box"><h2>Contrôles</h2><ul class="checks">${warn.map(([c, t]) => `<li class="${c}">${esc(t)}</li>`).join('')}</ul></section>`;
+};
+
+// Boutique
+function preview(c) {
+  const g = `linear-gradient(135deg, ${c.colors[0]}, ${c.colors[1]})`;
+  if (c.kind === 'theme') return `<span class="feltchip" style="display:inline-block;background:radial-gradient(circle at 50% 40%, ${c.colors[0]}, ${c.colors[1]})"></span>`;
+  if (c.kind === 'cardBack') return `<span class="back" style="display:inline-block;background:${g}"></span>`;
+  if (c.kind === 'avatar') return `<span class="av" style="background:${g};width:36px;height:36px">${esc(c.name[0])}</span>`;
+  return `<span style="display:inline-block;width:36px;height:36px;border-radius:50%;border:4px solid ${c.colors[0]};box-shadow:0 0 0 2px ${c.colors[1]}"></span>`;
+}
+VIEWS.boutique = () => {
+  const d = S.draft;
+  const sales = id => S.txs.filter(t => t.pack === id);
+  const owners = c => S.players.filter(p => p.owned.includes(cosKey(c))).length;
+  const checks = [];
+  const rate = pk => pk.coins / pk.priceCents;
+  const base = d.coinPacks[0], perEuro = base.coins / (base.priceCents / 100);
+  d.coinPacks.filter(p => p.active).forEach((pk, i, a) => { if (i && rate(pk) <= rate(a[i - 1])) checks.push(['e', `Le pack « ${pk.id} » donne moins de pièces par euro que « ${a[i - 1].id} ».`]); });
+  d.coinPacks.forEach(pk => { const real = Math.round(100 * (rate(pk) / rate(base) - 1)); if (pk !== base && Math.abs(real - pk.bonusPercent) > 5) checks.push(['w', `« ${pk.id} » affiche +${pk.bonusPercent} % mais donne réellement +${real} % par rapport au pack de base.`]); });
+  const priced = allCosmetics(d).filter(c => c.price);
+  if (priced.length) { const mx = Math.max(...priced.map(c => c.price)); checks.push(['', `Cosmétique le plus cher : ${fmt(mx)} pièces, soit ${eur(100 * mx / perEuro)} au tarif de base.`]); }
+  const top = d.rooms[d.rooms.length - 1], pop = d.coinPacks.find(p => p.tag === 'Populaire') ?? d.coinPacks[2];
+  if (top && pop) checks.push(['', `Une cave en ${top.name} (${fmt(top.bigBlind * d.buyInBigBlinds)} pièces) vaut ${(top.bigBlind * d.buyInBigBlinds / pop.coins).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} fois le pack « ${pop.id} ».`]);
+  const week = d.dailyRewards.reduce((a, b) => a + b, 0) + 6 * 7 * (d.freeGains.chestMin + d.freeGains.chestMax) / 2;
+  checks.push(['', `Un joueur assidu gagne environ ${fmt(week)} pièces gratuites par semaine (bonus quotidien et coffres, sans missions), soit ${eur(100 * week / perEuro)} au tarif de base.`]);
+  const cosTable = key => `<div class="scroll"><table><thead><tr><th>Aperçu</th><th>Nom</th><th>Identifiant</th><th>Couleurs</th><th>Motif</th><th class="n">Prix (pièces)</th><th class="n">Niveau min.</th><th>VIP</th><th class="n">Possédé par</th><th>En vente</th></tr></thead><tbody>
+    ${d.cosmetics[key].map((c, i) => { const p = `cosmetics.${key}.${i}`; return `<tr><td>${preview(c)}</td><td>${field(p + '.name', 'text', 'w-m')}</td><td class="muted small">${esc(cosKey(c))}</td><td>${field(p + '.colors.0', 'color')} ${field(p + '.colors.1', 'color')}</td><td>${field(p + '.pattern', PATTERNS)}</td><td class="n">${field(p + '.price')}</td><td class="n">${field(p + '.minLevel', 'number', 'w-s')}</td><td>${field(p + '.vipOnly', 'checkbox')}</td><td class="n">${fmt(owners(c))}</td><td>${field(p + '.active', 'checkbox')}</td></tr>`; }).join('')}
+    </tbody></table></div><div class="formrow"><button class="btn" data-action="add-cos" data-key="${key}">Ajouter</button><span class="muted small">Prix 0 = offert à tous (ou à tous les VIP si la case VIP est cochée).</span></div>`;
+  const packRow = (path, pk, note) => { const s = sales(pk.id); return `<tr><td><b>${esc(pk.id)}</b>${note ? `<br><span class="muted small">${note}</span>` : ''}</td><td class="n">${field(path + '.coins')}</td><td class="n">${field(path + '.priceCents', 'number', 'w-s')}</td><td class="n">${eur(pk.priceCents)}</td><td class="n">${fmt(pk.coins / (pk.priceCents / 100))}</td><td class="n">${'bonusPercent' in pk ? field(path + '.bonusPercent', 'number', 'w-s') : ''}</td><td>${'tag' in pk ? field(path + '.tag', 'text', 'w-m') : field(path + '.days', 'number', 'w-s') + ' j'}</td><td class="n">${fmt(s.length)}</td><td class="n">${eur(s.reduce((a, t) => a + t.c, 0))}</td><td>${field(path + '.active', 'checkbox')}</td></tr>`; };
+  return head('Boutique', 'Packs de pièces, offres spéciales et cosmétiques') +
+    `<div class="seg" role="group" aria-label="Rayon">${[['packs', 'Pièces et offres'], ...KINDS].map(([k, l]) => `<button data-action="shoptab" data-k="${k}" aria-pressed="${UI.shopTab === k}">${l}</button>`).join('')}</div>
+    ${UI.shopTab === 'packs' ? `<section class="box"><header><h2>Packs de pièces</h2><p>prix en centimes, encaissés par l’App Store ou Google Play</p></header>
+      <div class="scroll"><table><thead><tr><th>Pack</th><th class="n">Pièces</th><th class="n">Prix (cts)</th><th class="n">Prix</th><th class="n">Pièces par €</th><th class="n">Bonus affiché %</th><th>Étiquette / durée</th><th class="n">Ventes 30 j</th><th class="n">Revenus</th><th>En vente</th></tr></thead><tbody>
+      ${d.coinPacks.map((pk, i) => packRow('coinPacks.' + i, pk)).join('')}${packRow('welcomeOffer', d.welcomeOffer, 'offre de bienvenue')}${packRow('vipPass', d.vipPass, 'pass VIP : coffre toutes les ' + d.freeGains.chestEveryHoursVip + ' h, cosmétiques VIP')}
+      </tbody></table></div><p class="muted small" style="margin:0">Les prix réels se règlent aussi dans App Store Connect et la Google Play Console : l’identifiant du pack doit y correspondre.</p></section>
+      <section class="box"><h2>Cohérence des prix</h2><ul class="checks">${checks.map(([c, t]) => `<li class="${c}">${esc(t)}</li>`).join('')}</ul></section>`
+      : `<section class="box"><header><h2>${KINDS.find(k => k[0] === UI.shopTab)[1]}</h2><p>${fmt(d.cosmetics[UI.shopTab].length)} articles</p></header>${cosTable(UI.shopTab)}</section>`}`;
+};
+
+// Réglages
+VIEWS.reglages = () => {
+  const d = S.draft;
+  return head('Réglages', 'Pièces de départ, bonus quotidien, missions, annonce et config distante') +
+    `<div class="grid2">
+      <section class="box"><h2>Pièces</h2>
+        <div class="formrow"><label for="f-startingCoins">Pièces offertes à l’inscription</label>${field('startingCoins')}</div>
+        <h3>Bonus quotidien (jours 1 à 7)</h3>
+        <div class="formrow">${d.dailyRewards.map((_, i) => `<label class="small muted" style="display:grid;gap:2px">J${i + 1}${field('dailyRewards.' + i, 'number', 'w-s')}</label>`).join('')}</div>
+        <span class="muted small">Série complète : ${fmt(d.dailyRewards.reduce((a, b) => +a + +b, 0))} pièces par semaine.</span>
+        <h3>Gains gratuits</h3>
+        <div class="scroll"><table><tbody>
+          <tr><td>Coffre gratuit toutes les (heures)</td><td class="n">${field('freeGains.chestEveryHours', 'number', 'w-s')}</td></tr>
+          <tr><td>… pour les VIP (heures)</td><td class="n">${field('freeGains.chestEveryHoursVip', 'number', 'w-s')}</td></tr>
+          <tr><td>Contenu du coffre, de</td><td class="n">${field('freeGains.chestMin')}</td></tr>
+          <tr><td>… à</td><td class="n">${field('freeGains.chestMax')}</td></tr>
+          <tr><td>Passage de niveau (pièces × niveau)</td><td class="n">${field('freeGains.levelUpPerLevel')}</td></tr>
+          <tr><td>Coup de pouce si ruiné</td><td class="n">${field('freeGains.rescueCoins')}</td></tr>
+          <tr><td>… au plus toutes les (heures)</td><td class="n">${field('freeGains.rescueEveryHours', 'number', 'w-s')}</td></tr>
+        </tbody></table></div>
+        <h3>Récompenses des missions</h3>
+        <div class="scroll"><table><tbody>${[['hands', 'Jouer N mains'], ['boards', 'Gagner N boards'], ['flush', 'Gagner un board avec une couleur ou mieux'], ['scoop', 'Rafler les 3 boards d’un pot']].map(([k, l]) => `<tr><td>${l}</td><td class="n">${field('missionRewards.' + k)}</td></tr>`).join('')}</tbody></table></div>
+      </section>
+      <section class="box"><h2>Annonce dans l’app</h2>
+        <div class="formrow"><label for="f-announcement.active">Afficher sur l’accueil</label>${field('announcement.active', 'checkbox')}</div>
+        <input type="text" id="f-announcement.text" data-path="announcement.text" value="${esc(d.announcement.text)}" placeholder="Ex. : week-end double points de ligue en salle Prestige" aria-label="Texte de l’annonce">
+        <h2 style="margin-top:8px">Config distante</h2>
+        <p class="muted small" style="margin:0">Le JSON que le serveur servira à l’app au démarrage. Il reprend la forme de catalog.dart.</p>
+        <pre class="json" id="json">${esc(JSON.stringify(S.config, null, 2))}</pre>
+        <div class="formrow"><button class="btn" data-action="copy-json">Copier le JSON publié</button></div>
+      </section>
+    </div>`;
+};
+
+// ---------- Brouillon et publication ----------
+const dirty = () => JSON.stringify(S.draft) !== JSON.stringify(S.config);
+function renderPub() {
+  $('#cfgver').textContent = `Config v${S.config.version}` + (S.config.publishedAt ? ` · ${dateFr(S.config.publishedAt)}` : '');
+  $('#pubbar').innerHTML = dirty() ? `<div class="pub"><div class="in"><span><b>Modifications non publiées</b> <span class="muted">· elles s’appliqueront à tous les joueurs à leur prochaine ouverture de l’app</span></span>
+    <span class="tools"><button class="btn ghost" data-action="discard">Annuler les modifications</button><button class="btn primary" data-action="publish">Publier la version ${S.config.version + 1}</button></span></div></div>` : '';
+}
+function setPath(obj, path, value) {
+  const ks = path.split('.'); let o = obj;
+  for (const k of ks.slice(0, -1)) o = o[k];
+  o[ks[ks.length - 1]] = value;
+}
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => { t.hidden = true; }, 2200); }
+
+// ---------- Navigation ----------
+let current = 'tableau';
+function render() {
+  $('#view').innerHTML = VIEWS[current]();
+  if (current === 'joueurs') playerList();
+  document.querySelectorAll('#nav a').forEach(a => a.setAttribute('aria-current', a.getAttribute('href') === '#' + current ? 'page' : 'false'));
+  renderPub(); renderDrawer();
+}
+function go() { const h = location.hash.slice(1); current = VIEWS[h] ? h : 'tableau'; UI.confirm = null; openId = null; render(); window.scrollTo(0, 0); }
+window.addEventListener('hashchange', go);
+
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (el.id === 'q') { UI.q = el.value; UI.page = 0; playerList(); return; }
+  if (!el.dataset.path) return;
+  const v = el.type === 'checkbox' ? el.checked : el.type === 'number' ? Math.max(0, Math.round(+el.value || 0)) : el.value;
+  setPath(S.draft, el.dataset.path, v);
+  save(); renderPub();
+});
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (el.id === 'filter') { UI.filter = el.value; UI.page = 0; playerList(); }
+  else if (el.id === 'sort') { UI.sort = el.value; UI.page = 0; playerList(); }
+  // Les champs liés recalculent les contrôles et totaux quand on quitte le champ.
+  else if (el.dataset.path) render();
+});
+document.addEventListener('submit', e => {
+  e.preventDefault();
+  const f = e.target, p = byId(openId), data = new FormData(f);
+  if (f.dataset.form === 'coins') {
+    const amount = Math.round(+data.get('amount'));
+    if (!amount) return;
+    const applied = Math.max(amount, -p.coins);
+    p.coins += applied;
+    S.txs.unshift({ id: S.nextTx++, p: p.id, k: 'admin', a: applied, t: Date.now(), note: String(data.get('reason')) });
+    toast(`${applied > 0 ? '+' : ''}${fmt(applied)} pièces pour ${p.name}`);
+  } else if (f.dataset.form === 'rename') {
+    const n = String(data.get('name')).trim().slice(0, 14);
+    if (!n) return;
+    p.name = n; toast('Pseudo modifié');
+  } else if (f.dataset.form === 'ban') {
+    p.banned = true; p.banReason = String(data.get('reason')).trim(); UI.confirm = null; toast(`${p.name} est banni`);
+  }
+  save(); render();
+});
+document.addEventListener('click', async e => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const a = el.dataset.action;
+  if (a === 'open-player') { openId = el.dataset.id; UI.confirm = null; renderDrawer(); }
+  else if (a === 'close-player') { openId = null; UI.confirm = null; renderDrawer(); }
+  else if (a === 'page') { UI.page += +el.dataset.d; playerList(); }
+  else if (a === 'ask-ban') { UI.confirm = 'ban'; renderDrawer(); $('#ban-reason')?.focus(); }
+  else if (a === 'cancel-confirm') { UI.confirm = null; render(); }
+  else if (a === 'unban') { const p = byId(openId); p.banned = false; p.banReason = ''; save(); render(); toast('Bannissement levé'); }
+  else if (a === 'ledger') { UI.ledger = el.dataset.k; render(); }
+  else if (a === 'league') { UI.league = +el.dataset.i; render(); }
+  else if (a === 'shoptab') { UI.shopTab = el.dataset.k; render(); }
+  else if (a === 'ask-week') { UI.confirm = 'week'; render(); }
+  else if (a === 'close-week') {
+    let total = 0;
+    for (const x of weekPayouts()) {
+      x.p.coins += x.coins; total += x.coins;
+      S.txs.unshift({ id: S.nextTx++, p: x.p.id, k: 'league', a: x.coins, t: Date.now(), note: `${x.rank}e en ${x.league.name}` });
+    }
+    S.players.forEach(p => { p.weeklyPoints = 0; });
+    S.weeks.unshift({ t: Date.now(), total });
+    UI.confirm = null; save(); render(); toast(`${fmt(total)} pièces versées`);
+  }
+  else if (a === 'add-room') { const n = S.draft.rooms.length + 1; S.draft.rooms.push({ id: 'salle' + n, name: 'Nouvelle salle', smallBlind: 500, bigBlind: 1000, minLevel: 8, leagueMultiplier: 4, color: '#FF7A6B', active: false }); save(); render(); }
+  else if (a === 'del-room') { S.draft.rooms.splice(+el.dataset.i, 1); save(); render(); }
+  else if (a === 'add-cos') { const k = el.dataset.key, list = S.draft.cosmetics[k], kind = { themes: 'theme', cardBacks: 'cardBack', avatars: 'avatar', frames: 'frame' }[k]; list.push({ id: 'nouveau' + (list.length + 1), kind, name: 'Nouveau', price: 50000, colors: ['#5A3FA8', '#24154F'], pattern: 'none', minLevel: 1, vipOnly: false, active: false }); save(); render(); }
+  else if (a === 'grant-vip') { const p = byId(openId); p.vipUntil = Math.max(Date.now(), p.vipUntil) + 30 * DAY; S.txs.unshift({ id: S.nextTx++, p: p.id, k: 'admin', a: 0, t: Date.now(), note: '30 jours de VIP offerts' }); save(); render(); toast('VIP accordé'); }
+  else if (a === 'clear-bio') { byId(openId).bio = ''; save(); render(); toast('Bio effacée'); }
+  else if (a === 'clear-photo') { byId(openId).avatarUrl = null; save(); render(); toast('Photo retirée'); }
+  else if (a === 'discard') { S.draft = clone(S.config); save(); render(); toast('Modifications annulées'); }
+  else if (a === 'publish') { S.draft.version = S.config.version + 1; S.draft.publishedAt = Date.now(); S.config = clone(S.draft); save(); render(); toast(`Version ${S.config.version} publiée`); }
+  else if (a === 'copy-json') {
+    const text = JSON.stringify(S.config, null, 2);
+    try { await navigator.clipboard.writeText(text); toast('JSON copié'); }
+    catch (_) { const r = document.createRange(); r.selectNodeContents($('#json')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('Texte sélectionné : copiez-le'); }
+  }
+  else if (a === 'reset-demo') { S = generateDemo(); save(); openId = null; render(); toast('Démo régénérée'); }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && openId) { openId = null; UI.confirm = null; renderDrawer(); } });
+
+load();
+go();
+</script>
