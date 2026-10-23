@@ -61,9 +61,23 @@ export function splitAmong(amount: number, winners: readonly string[]): Map<stri
   return out;
 }
 
-/** Coupe un pot en trois tiers, un par board. Les jetons en trop vont au board 1, puis 2. */
-export function splitInThirds(amount: number): [number, number, number] {
-  const third = Math.floor(amount / 3);
-  const rest = amount - third * 3;
-  return [third + (rest > 0 ? 1 : 0), third + (rest > 1 ? 1 : 0), third];
+/** Un board vaut 1 point ; compté en soixantièmes pour partager exactement entre 2 à 6 gagnants. */
+export const POINT = 60;
+
+/**
+ * Points de chaque joueur sur un pot : chaque board donne 1 point, partagé à parts égales en cas d'égalité.
+ * `boardWinners[b]` = gagnants du board b parmi les joueurs éligibles au pot.
+ */
+export function boardPoints(boardWinners: readonly (readonly string[])[]): Map<string, number> {
+  const points = new Map<string, number>();
+  for (const winners of boardWinners) {
+    for (const id of winners) points.set(id, (points.get(id) ?? 0) + POINT / winners.length);
+  }
+  return points;
+}
+
+/** Joueurs qui remportent le pot : le plus de points. Plusieurs seulement en cas d'égalité parfaite. */
+export function potWinners(points: Map<string, number>, order: readonly string[]): string[] {
+  const best = Math.max(...points.values());
+  return order.filter((id) => points.get(id) === best);
 }

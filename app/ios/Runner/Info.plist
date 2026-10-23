@@ -66,5 +66,15 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choisis une photo de profil pour ton compte.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Prends une photo de profil pour ton compte.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Choisis les amis que tu veux inviter à jouer, par SMS. Tes contacts ne quittent pas ton téléphone.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>sms</string>
+	</array>
 </dict>
 </plist>

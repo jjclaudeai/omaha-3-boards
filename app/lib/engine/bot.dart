@@ -21,12 +21,15 @@ class BotProfile {
   static const difficile = BotProfile(samples: 300, aggression: 0.7, bluff: 0.1);
 }
 
-/// Part du pot gagnée en moyenne contre [opponents] mains aléatoires ; chaque board vaut un tiers.
+/// Part du pot gagnée en moyenne contre [opponents] mains aléatoires.
+/// Chaque board vaut 1 point ; le meilleur total prend le pot.
 double estimateEquity(List<CardId> hole, List<List<CardId>> boards, int opponents, int samples, Random rng) {
   final known = {...hole, ...boards.expand((b) => b)};
   final rest = newDeck().where((c) => !known.contains(c)).toList();
   final missing = 5 - boards[0].length;
   final needed = opponents * holeCards + missing * boardCount;
+  final points = List<double>.filled(opponents + 1, 0);
+  final scores = List<int>.filled(opponents + 1, 0);
   var total = 0.0;
   for (var s = 0; s < samples; s++) {
     for (var i = 0; i < needed; i++) {
@@ -41,22 +44,22 @@ double estimateEquity(List<CardId> hole, List<List<CardId>> boards, int opponent
       opp.add(rest.sublist(k, k + holeCards));
       k += holeCards;
     }
+    points.fillRange(0, points.length, 0);
     for (final b in boards) {
       final full = [...b, ...rest.sublist(k, k + missing)];
       k += missing;
-      final mine = bestOmahaScore(hole, full);
-      var best = mine;
-      var ties = 1;
-      for (final h in opp) {
-        final sc = bestOmahaScore(h, full);
-        if (sc > best) {
-          ties = 0;
-          break;
-        }
-        if (sc == best) ties++;
+      scores[0] = bestOmahaScore(hole, full);
+      for (var o = 0; o < opponents; o++) {
+        scores[o + 1] = bestOmahaScore(opp[o], full);
       }
-      if (ties > 0) total += 1 / ties / boardCount;
+      final best = scores.reduce(max);
+      final ties = scores.where((x) => x == best).length;
+      for (var i = 0; i <= opponents; i++) {
+        if (scores[i] == best) points[i] += 1 / ties;
+      }
     }
+    final top = points.reduce(max);
+    if (points[0] == top) total += 1 / points.where((x) => (x - top).abs() < 1e-9).length;
   }
   return total / samples;
 }
