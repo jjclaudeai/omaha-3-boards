@@ -17,7 +17,7 @@ Application mobile (iOS et Android) de poker Omaha 6 cartes Pot-Limit joué sur 
   - `src/cards.ts` : cartes, paquet, mélange.
   - `src/evaluator.ts` : valeur d'une main de 5 cartes.
   - `src/omaha.ts` : meilleure main Omaha (exactement 2 cartes privées + 3 du board).
-  - `src/pots.ts` : pot principal, pots annexes, mise non suivie, partage en trois tiers.
+  - `src/pots.ts` : pot principal, pots annexes, mise non suivie, points par board (1 point par board, fractions en cas d’égalité).
   - `src/game.ts` : une main complète (blindes, 4 tours d'enchères Pot-Limit, 3 boards, abattage).
   - `src/bot.ts` : bots à 3 niveaux, basés sur une estimation Monte-Carlo de l'équité.
 
@@ -27,7 +27,7 @@ Application mobile (iOS et Android) de poker Omaha 6 cartes Pot-Limit joué sur 
 - 3 boards de 5 cartes (flop, turn, river distribués sur les 3 boards à la fois).
 - Pot-Limit, petite et grosse blinde ; en tête-à-tête, le bouton paie la petite blinde.
 - Chaque board : exactement 2 cartes privées + 3 cartes du board.
-- Chaque pot est coupé en trois tiers égaux, un par board ; jetons indivisibles au premier joueur après le bouton.
+- Chaque board vaut 1 point (partagé à parts égales en cas d’égalité sur ce board). Le joueur qui a le plus de points remporte le pot entier ; le pot n’est partagé qu’entre les joueurs à égalité de points (1,5 / 1,5, ou 1 / 1 / 1). Jetons indivisibles au premier joueur après le bouton.
 
 ## Lancer
 

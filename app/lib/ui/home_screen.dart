@@ -92,16 +92,38 @@ class _PlayCard extends StatelessWidget {
                   child: Text('OMAHA 6 CARTES', style: body(11.5, color: Palette.gold, weight: FontWeight.w800).copyWith(letterSpacing: 1.2)),
                 ),
                 const SizedBox(height: 8),
-                Text('3 boards,\n1 pot en trois', style: display(27)),
+                Text('3 boards,\n1 pot à rafler', style: display(27)),
                 const SizedBox(height: 6),
-                Text('Salle ${room.name} · cave ${formatCoins(room.buyIn)}', style: body(14, color: const Color(0xFFCDEBD9))),
+                // Choix des blindes directement depuis l'accueil.
+                Pressable(
+                  onTap: () async {
+                    final r = await pickRoom(context, current: room);
+                    if (r != null && context.mounted) await playRoom(context, r);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0x55CDEBD9)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('${room.name} · blindes ${formatCoins(room.smallBlind)}/${formatCoins(room.bigBlind)}',
+                            style: body(14, color: const Color(0xFFCDEBD9))),
+                        const Icon(Icons.expand_more_rounded, color: Color(0xFFCDEBD9), size: 20),
+                      ],
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 ChunkyButton(
                   label: 'Jouer maintenant',
                   icon: Icons.play_arrow_rounded,
                   height: 58,
                   fontSize: 22,
-                  onTap: () => openRoom(context, room),
+                  onTap: () => playRoom(context, room),
                 ),
               ],
             ),

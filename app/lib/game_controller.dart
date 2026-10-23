@@ -7,7 +7,7 @@ import 'engine/bot.dart';
 import 'engine/evaluator.dart';
 import 'engine/game.dart';
 import 'engine/omaha.dart';
-import 'engine/pots.dart';
+import 'engine/pots.dart' show point;
 import 'state/catalog.dart';
 import 'state/profile.dart';
 
@@ -30,19 +30,39 @@ class SeatBadge {
   final bool highlight;
 }
 
-/// Ce que l'écran montre pendant l'abattage d'un board.
+/// Ce que l'écran montre pendant l'abattage d'un board (pot principal).
 class BoardReveal {
-  const BoardReveal({required this.board, required this.winners, required this.handName, required this.amount, required this.best});
+  const BoardReveal({required this.board, required this.winners, required this.handName, required this.best, required this.tally});
   final int board;
+
+  /// Joueurs qui prennent le point de ce board (plusieurs = point partagé).
   final List<String> winners;
   final String handName;
-  final int amount;
 
   /// Main gagnante (2 cartes privées + 3 du board) du premier gagnant.
   final BestHand best;
+
+  /// Score cumulé après ce board, en soixantièmes de point.
+  final Map<String, int> tally;
 }
 
-enum Phase { betting, revealCards, revealBoard, summary }
+/// Résultat d'un pot : qui le remporte, combien, avec combien de points.
+class PotResult {
+  const PotResult({required this.pot, required this.winners, required this.amount, required this.points});
+  final int pot;
+  final List<String> winners;
+  final int amount;
+  final Map<String, int> points;
+}
+
+/// Points affichés : 1, 1,5, 0,5, 2…
+String formatPoints(int sixtieths) {
+  final v = sixtieths / point;
+  if (v == v.roundToDouble()) return v.round().toString();
+  return v.toStringAsFixed(v * 2 == (v * 2).roundToDouble() ? 1 : 2).replaceAll('.', ',');
+}
+
+enum Phase { betting, revealCards, revealBoard, revealPot, summary }
 
 /// Pilote une partie locale contre des bots : enchaîne les mains, fait jouer les bots à leur rythme,
 /// puis déroule l'abattage board par board. En multijoueur, ce rôle passera au serveur.
@@ -76,9 +96,7 @@ class GameController extends ChangeNotifier {
   /// Board en cours de dévoilement (0 à 2), pendant [Phase.revealBoard].
   int revealIndex = -1;
   List<BoardReveal> reveals = [];
-
-  /// Gains de chaque joueur par board, pour faire monter les tapis au fil de l'abattage.
-  final Map<int, Map<String, int>> _boardPayouts = {};
+  List<PotResult> potResults = [];
 
   /// Points de ligue gagnés sur la dernière main.
   int lastLeaguePoints = 0;
@@ -149,8 +167,8 @@ class GameController extends ChangeNotifier {
     _button = (_button + 1) % seats.length;
     badges.clear();
     reveals = [];
+    potResults = [];
     revealIndex = -1;
-    _boardPayouts.clear();
     lastLeaguePoints = 0;
     phase = Phase.betting;
     handNumber++;
@@ -221,18 +239,12 @@ class GameController extends ChangeNotifier {
     });
   }
 
-  /// Tapis affichés : pendant l'abattage, les gains des boards pas encore montrés sont retenus.
+  /// Tapis affichés : pendant l'abattage, les gains restent dans le pot jusqu'à l'annonce du gagnant.
   void _syncStacks() {
     final h = hand!;
+    final holding = h.isComplete && (phase == Phase.revealCards || phase == Phase.revealBoard);
     for (final p in h.players) {
-      var stack = p.stack;
-      if (h.isComplete && phase != Phase.summary) {
-        for (var b = 0; b < boardCount; b++) {
-          if (phase == Phase.revealBoard && b <= revealIndex) continue;
-          stack -= _boardPayouts[b]?[p.id] ?? 0;
-        }
-      }
-      seatById(p.id).stack = stack;
+      seatById(p.id).stack = p.stack - (holding ? h.winnings[p.id] ?? 0 : 0);
     }
   }
 
@@ -244,22 +256,23 @@ class GameController extends ChangeNotifier {
     if (h.showdownHands.isEmpty) {
       // Tout le monde s'est couché : pas d'abattage.
       final e = h.events.whereType<UncontestedWinEvent>().first;
-      badges[e.id] = SeatBadge('+${e.amount}', highlight: true);
+      badges[e.id] = SeatBadge('+${formatAmount(e.amount)}', highlight: true);
       _finish();
       return;
     }
-    for (final e in h.events.whereType<BoardWinEvent>()) {
-      final share = splitAmong(e.amount, e.winners);
-      final map = _boardPayouts.putIfAbsent(e.board, () => {});
-      share.forEach((id, v) => map[id] = (map[id] ?? 0) + v);
-    }
+    potResults = [
+      for (final e in h.events.whereType<PotWinEvent>())
+        PotResult(pot: e.pot, winners: e.winners, amount: e.amount, points: e.points),
+    ];
+    final tally = <String, int>{};
     reveals = [
-      for (var b = 0; b < boardCount; b++)
+      for (final e in h.events.whereType<BoardWinEvent>().where((e) => e.pot == 0))
         () {
-          final main = h.events.whereType<BoardWinEvent>().firstWhere((e) => e.board == b && e.pot == 0);
-          final best = h.showdownHands[main.winners.first]![b];
-          final total = h.events.whereType<BoardWinEvent>().where((e) => e.board == b).fold(0, (s, e) => s + e.amount);
-          return BoardReveal(board: b, winners: main.winners, handName: best.name, amount: total, best: best);
+          for (final id in e.winners) {
+            tally[id] = (tally[id] ?? 0) + point ~/ e.winners.length;
+          }
+          final best = h.showdownHands[e.winners.first]![e.board];
+          return BoardReveal(board: e.board, winners: e.winners, handName: best.name, best: best, tally: Map.of(tally));
         }(),
     ];
     badges.removeWhere((k, v) => v.text != 'Couché');
@@ -273,20 +286,32 @@ class GameController extends ChangeNotifier {
     phase = Phase.revealBoard;
     revealIndex = b;
     final r = reveals[b];
-    for (final id in badges.keys.toList()) {
-      if (badges[id]!.text != 'Couché') badges.remove(id);
-    }
-    for (final id in r.winners) {
-      badges[id] = SeatBadge('+${formatAmount(_boardPayouts[b]![id] ?? 0)}', highlight: true);
+    badges.removeWhere((k, v) => v.text != 'Couché');
+    // Le score de chacun s'affiche sous son siège et grandit board après board.
+    r.tally.forEach((id, pts) {
+      badges[id] = SeatBadge('${formatPoints(pts)} pt${pts > point ? 's' : ''}', highlight: r.winners.contains(id));
+    });
+    _syncStacks();
+    notifyListeners();
+    _timer = Timer(boardPause, () => b + 1 < boardCount ? _revealBoard(b + 1) : _revealPot());
+  }
+
+  void _revealPot() {
+    phase = Phase.revealPot;
+    revealIndex = -1;
+    final h = hand!;
+    badges.removeWhere((k, v) => v.text != 'Couché');
+    for (final e in h.winnings.entries) {
+      badges[e.key] = SeatBadge('+${formatAmount(e.value)}', highlight: true);
     }
     _syncStacks();
     notifyListeners();
-    _timer = Timer(boardPause, () => b + 1 < boardCount ? _revealBoard(b + 1) : _finish());
+    _timer = Timer(boardPause, _finish);
   }
 
   /// Passe l'abattage en cours (bouton « Passer »).
   void skipReveal() {
-    if (phase == Phase.revealCards || phase == Phase.revealBoard) _finish();
+    if (phase == Phase.revealCards || phase == Phase.revealBoard || phase == Phase.revealPot) _finish();
   }
 
   void _finish() {
@@ -314,11 +339,14 @@ class GameController extends ChangeNotifier {
         bestCat = max(bestCat, categoryOf(h.showdownHands[me.id]![e.board].score));
       }
     }
+    final mainPot = h.events.whereType<PotWinEvent>().where((e) => e.pot == 0);
     // Pot gagné sans abattage : compte comme un board, sans rafle.
     final uncontested = h.events.whereType<UncontestedWinEvent>().any((e) => e.id == me.id);
     if (uncontested) won = 1;
+    final potWon = uncontested || (mainPot.isNotEmpty && mainPot.first.winners.contains(me.id));
+    final scooped = mainPot.isNotEmpty && (mainPot.first.points[me.id] ?? 0) == boardCount * point;
     lastLeaguePoints = profile.recordHand(
-      HandOutcome(boardsWon: won, bestWinningCategory: bestCat, scooped: !uncontested && won == boardCount, net: me.stack - startStack),
+      HandOutcome(boardsWon: won, bestWinningCategory: bestCat, scooped: scooped, potWon: potWon, net: me.stack - startStack),
       room,
     );
   }

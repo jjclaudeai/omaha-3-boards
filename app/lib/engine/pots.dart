@@ -58,9 +58,22 @@ Map<String, int> splitAmong(int amount, List<String> winners) {
   return out;
 }
 
-/// Trois tiers, un par board. Les jetons en trop vont au board 1, puis 2.
-List<int> splitInThirds(int amount) {
-  final third = amount ~/ 3;
-  final rest = amount - third * 3;
-  return [third + (rest > 0 ? 1 : 0), third + (rest > 1 ? 1 : 0), third];
+/// Un board vaut 1 point ; compté en soixantièmes pour partager exactement entre 2 à 6 gagnants.
+const point = 60;
+
+/// Points de chaque joueur sur un pot : chaque board donne 1 point, partagé à parts égales en cas d'égalité.
+Map<String, int> boardPoints(List<List<String>> boardWinners) {
+  final points = <String, int>{};
+  for (final winners in boardWinners) {
+    for (final id in winners) {
+      points[id] = (points[id] ?? 0) + point ~/ winners.length;
+    }
+  }
+  return points;
+}
+
+/// Joueurs qui remportent le pot : le plus de points. Plusieurs seulement en cas d'égalité parfaite.
+List<String> potWinners(Map<String, int> points, List<String> order) {
+  final best = points.values.reduce((a, b) => a > b ? a : b);
+  return order.where((id) => points[id] == best).toList();
 }

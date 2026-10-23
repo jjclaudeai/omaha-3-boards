@@ -77,12 +77,21 @@ class StreetEvent extends GameEvent {
   final Street street;
 }
 
+/// Gagnants d'un board pour un pot : ils se partagent le point du board.
 class BoardWinEvent extends GameEvent {
-  BoardWinEvent(this.board, this.pot, this.winners, this.amount);
+  BoardWinEvent(this.board, this.pot, this.winners);
   final int board;
   final int pot;
   final List<String> winners;
+}
+
+/// Le pot va au(x) joueur(s) qui ont le plus de points ([point] = 1 board).
+class PotWinEvent extends GameEvent {
+  PotWinEvent(this.pot, this.winners, this.amount, this.points);
+  final int pot;
+  final List<String> winners;
   final int amount;
+  final Map<String, int> points;
 }
 
 class UncontestedWinEvent extends GameEvent {
@@ -302,16 +311,19 @@ class OmahaHand {
     final order = _seatOrderFromButton();
     for (var pi = 0; pi < pots.length; pi++) {
       final pot = pots[pi];
-      final thirds = splitInThirds(pot.amount);
+      // Chaque board vaut 1 point ; le meilleur total remporte tout le pot, partage seulement en cas d'égalité.
+      final boardWinners = <List<String>>[];
       for (var board = 0; board < boardCount; board++) {
-        final amount = thirds[board];
-        if (amount == 0) continue;
         final best = pot.eligible.map((id) => showdownHands[id]![board].score).reduce(max);
         final winners =
             order.where((id) => pot.eligible.contains(id) && showdownHands[id]![board].score == best).toList();
-        splitAmong(amount, winners).forEach(_credit);
-        events.add(BoardWinEvent(board, pi, winners, amount));
+        events.add(BoardWinEvent(board, pi, winners));
+        boardWinners.add(winners);
       }
+      final points = boardPoints(boardWinners);
+      final winners = potWinners(points, order);
+      splitAmong(pot.amount, winners).forEach(_credit);
+      events.add(PotWinEvent(pi, winners, pot.amount, points));
     }
     _complete();
   }

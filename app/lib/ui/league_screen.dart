@@ -84,7 +84,7 @@ class LeagueScreen extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 'Le 1er remporte ${formatCoins(p.league.weeklyReward)} pièces, le 2e et le 3e la moitié. '
-                'Chaque board gagné rapporte 10 points, multipliés par la salle.',
+                'Chaque board gagné rapporte 10 points et chaque pot remporté 20, multipliés par la salle.',
                 style: body(13, color: Palette.textLo, weight: FontWeight.w500),
               ),
               const SizedBox(height: 12),

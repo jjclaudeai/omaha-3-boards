@@ -5,10 +5,12 @@ import 'package:flutter/services.dart';
 
 import '../engine/cards.dart';
 import '../engine/game.dart';
+import '../engine/pots.dart' show point;
 import '../game_controller.dart';
 import '../state/catalog.dart';
 import '../state/profile_scope.dart';
 import 'card_widget.dart';
+import 'rooms_screen.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
 
@@ -38,7 +40,8 @@ class _TableScreenState extends State<TableScreen> {
     super.dispose();
   }
 
-  Future<void> _leave() async {
+  /// Demande confirmation si quitter maintenant fait perdre des jetons déjà misés.
+  Future<bool> _confirmLeave() async {
     final g = game!;
     final inHand = g.phase == Phase.betting && !g.hand!.players[0].folded && g.hand!.players[0].totalBet > 0;
     if (inHand) {
@@ -57,10 +60,28 @@ class _TableScreenState extends State<TableScreen> {
           ],
         ),
       );
-      if (ok != true) return;
+      if (ok != true) return false;
     }
-    g.leave();
+    return true;
+  }
+
+  Future<void> _leave() async {
+    if (!await _confirmLeave()) return;
+    game!.leave();
     if (mounted) Navigator.of(context).pop();
+  }
+
+  /// Change de salle (et donc de blindes) sans repasser par l'accueil.
+  Future<void> _switchRoom() async {
+    final g = game!;
+    final room = await pickRoom(context, current: g.room);
+    if (room == null || room == g.room || !mounted) return;
+    final h = g.hand;
+    final onTable = h != null && !h.isComplete ? h.players[0].stack : g.hero.stack;
+    if (!await openRoom(context, room, extraCoins: onTable) || !mounted) return;
+    if (!await _confirmLeave() || !mounted) return;
+    g.leave();
+    await pushTable(context, room, replace: true);
   }
 
   @override
@@ -90,7 +111,7 @@ class _TableScreenState extends State<TableScreen> {
                 felt: felt.colors,
                 child: Column(
                   children: [
-                    _TopBar(game: g, onLeave: _leave),
+                    _TopBar(game: g, onLeave: _leave, onSwitchRoom: _switchRoom),
                     Expanded(child: _Table(game: g)),
                     _HeroArea(game: g),
                     _ActionBar(game: g, onLeave: _leave),
@@ -118,9 +139,10 @@ class _TableLook extends InheritedWidget {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.game, required this.onLeave});
+  const _TopBar({required this.game, required this.onLeave, required this.onSwitchRoom});
   final GameController game;
   final VoidCallback onLeave;
+  final VoidCallback onSwitchRoom;
 
   @override
   Widget build(BuildContext context) {
@@ -134,12 +156,21 @@ class _TopBar extends StatelessWidget {
             tooltip: 'Quitter la table',
             icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Palette.textHi, size: 20),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(room.name, style: display(18)),
-              Text('Blindes ${formatCoins(room.smallBlind)}/${formatCoins(room.bigBlind)}', style: body(12, color: Palette.textLo)),
-            ],
+          // Toucher le nom de la salle ouvre le choix des blindes.
+          Pressable(
+            onTap: onSwitchRoom,
+            child: Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(room.name, style: display(18)),
+                    Text('Blindes ${formatCoins(room.smallBlind)}/${formatCoins(room.bigBlind)}', style: body(12, color: Palette.textLo)),
+                  ],
+                ),
+                const Icon(Icons.swap_vert_rounded, color: Palette.gold, size: 20),
+              ],
+            ),
           ),
           const SizedBox(width: 10),
           Container(
@@ -214,10 +245,8 @@ class _Boards extends StatelessWidget {
     if (h == null) return const SizedBox.shrink();
     final revealing = game.phase == Phase.revealBoard;
     final potShown = switch (game.phase) {
-      Phase.betting => h.pot,
-      Phase.revealCards => h.pot,
-      Phase.revealBoard => game.reveals.skip(game.revealIndex + 1).fold(0, (s, r) => s + r.amount),
-      Phase.summary => 0,
+      Phase.betting || Phase.revealCards || Phase.revealBoard => h.pot,
+      Phase.revealPot || Phase.summary => 0,
     };
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -365,6 +394,7 @@ class _BotSeat extends StatelessWidget {
     final showCards = game.phase != Phase.betting && h.showdownHands.containsKey(p.id);
     final reveal = game.phase == Phase.revealBoard ? game.reveals[game.revealIndex] : null;
     final winning = reveal != null && reveal.winners.contains(p.id);
+    final potWinner = game.phase == Phase.revealPot && (h.winnings[p.id] ?? 0) > 0;
     final usedHole = winning ? h.showdownHands[p.id]![reveal.board].hole.toSet() : const <CardId>{};
     final badge = game.badges[p.id];
     final back = _TableLook.of(context).back;
@@ -409,10 +439,10 @@ class _BotSeat extends StatelessWidget {
               color: Colors.black.withValues(alpha: p.folded ? 0.35 : 0.6),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: acting || winning ? Palette.gold : Colors.white12,
-                width: acting || winning ? 2 : 1,
+                color: acting || winning || potWinner ? Palette.gold : Colors.white12,
+                width: acting || winning || potWinner ? 2 : 1,
               ),
-              boxShadow: acting || winning ? const [BoxShadow(color: Color(0x88FFD54F), blurRadius: 12)] : null,
+              boxShadow: acting || winning || potWinner ? const [BoxShadow(color: Color(0x88FFD54F), blurRadius: 12)] : null,
             ),
             child: Column(
               children: [
@@ -430,7 +460,9 @@ class _BotSeat extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 3),
-          _Badge(badge: badge),
+          game.phase == Phase.betting && p.bet > 0 && badge == null
+              ? _BetChip(amount: p.bet)
+              : _Badge(badge: badge),
         ],
       ),
     );
@@ -455,6 +487,87 @@ class _StackChip extends StatelessWidget {
           builder: (context, v, _) => Text(formatCoins(v.round()), style: body(12.5, weight: FontWeight.w800)),
         ),
       ],
+    );
+  }
+}
+
+/// Jetons misés sur le tour en cours, posés devant le joueur.
+class _BetChip extends StatelessWidget {
+  const _BetChip({required this.amount});
+  final int amount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(11)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CoinIcon(size: 13),
+          const SizedBox(width: 4),
+          Text(formatCoins(amount), style: body(12.5, color: Palette.gold, weight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Ligne d'état du joueur : son tapis, sa mise sur ce tour et ce qu'il doit payer pour suivre.
+class _HeroStatus extends StatelessWidget {
+  const _HeroStatus({required this.game});
+  final GameController game;
+
+  @override
+  Widget build(BuildContext context) {
+    final h = game.hand!;
+    final me = h.players[0];
+    final toCall = game.phase == Phase.betting && !me.folded ? h.currentBet - me.bet : 0;
+    Widget cell(String label, int amount, {Color color = Palette.textHi}) => Expanded(
+          child: Column(
+            children: [
+              Text(label, style: body(11, color: Palette.textLo)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CoinIcon(size: 13),
+                  const SizedBox(width: 4),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(end: amount.toDouble()),
+                    duration: const Duration(milliseconds: 500),
+                    builder: (context, v, _) => Text(formatCoins(v.round()), style: display(16, color: color)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.black38,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: game.heroToAct ? Palette.gold : Colors.white10),
+      ),
+      child: Row(
+        children: [
+          if (game.button == 0) const _DealerButton(),
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(game.hero.name, style: body(13.5, color: game.heroToAct ? Palette.gold : Palette.textHi, weight: FontWeight.w800), overflow: TextOverflow.ellipsis),
+                SizedBox(height: 20, child: _Badge(badge: game.badges[me.id])),
+              ],
+            ),
+          ),
+          cell('Mon tapis', game.hero.stack),
+          cell('Ma mise', game.phase == Phase.betting ? me.bet : 0, color: Palette.gold),
+          cell('À suivre', toCall, color: toCall > 0 ? Palette.ruby : Palette.textLo),
+        ],
+      ),
     );
   }
 }
@@ -512,7 +625,6 @@ class _HeroArea extends StatelessWidget {
   Widget build(BuildContext context) {
     final h = game.hand!;
     final me = h.players[0];
-    final acting = game.heroToAct;
     final reveal = game.phase == Phase.revealBoard ? game.reveals[game.revealIndex] : null;
     final myHand = reveal != null && h.showdownHands.containsKey(me.id) ? h.showdownHands[me.id]![reveal.board] : null;
     final usedHole = myHand?.hole.toSet() ?? const <CardId>{};
@@ -547,17 +659,7 @@ class _HeroArea extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (game.button == 0) const _DealerButton(),
-                Text(game.hero.name, style: body(14.5, color: acting ? Palette.gold : Palette.textHi, weight: FontWeight.w800)),
-                const SizedBox(width: 8),
-                _StackChip(amount: game.hero.stack),
-                const SizedBox(width: 8),
-                _Badge(badge: game.badges[me.id]),
-              ],
-            ),
+            _HeroStatus(game: game),
           ],
         ),
       );
@@ -570,6 +672,37 @@ class _Narration extends StatelessWidget {
   const _Narration({required this.game});
   final GameController game;
 
+  String _name(String id) => id == game.hero.id ? 'Vous' : game.seatById(id).name;
+
+  /// Qui remporte le pot et avec combien de points ; une ligne par pot annexe.
+  Widget _potLines(Key key) {
+    return Column(
+      key: key,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final r in game.potResults) ...[
+          if (r.pot == 0)
+            Text(
+              r.winners.length > 1 ? 'POT PARTAGÉ' : 'POT REMPORTÉ',
+              style: body(11.5, color: Palette.gold, weight: FontWeight.w800).copyWith(letterSpacing: 1.4),
+            ),
+          Text(
+            r.winners.length > 1
+                ? '${r.winners.map(_name).join(' et ')} : ${formatCoins(r.amount ~/ r.winners.length)} chacun'
+                : '${_name(r.winners.first)} ${r.winners.first == game.hero.id ? 'remportez' : 'remporte'} ${formatCoins(r.amount)}${r.pot > 0 ? ' (pot annexe)' : ''}',
+            style: r.pot == 0 ? display(19) : body(13.5),
+            textAlign: TextAlign.center,
+          ),
+          if (r.pot == 0)
+            Text(
+              'avec ${formatPoints(r.points[r.winners.first]!)} point${r.points[r.winners.first]! > point ? 's' : ''} sur 3',
+              style: body(13.5, color: Palette.textLo),
+            ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final h = game.hand!;
@@ -581,8 +714,11 @@ class _Narration extends StatelessWidget {
         content = Text('Abattage : on retourne les cartes', style: display(17), key: const ValueKey('abattage'));
       case Phase.revealBoard:
         final r = game.reveals[game.revealIndex];
-        final names = r.winners.map((id) => id == game.hero.id ? 'Vous' : game.seatById(id).name).join(' et ');
+        final names = r.winners.map(_name).join(' et ');
         final mine = h.showdownHands[game.hero.id]?[r.board];
+        final score = (r.tally.entries.toList()..sort((a, b) => b.value - a.value))
+            .map((e) => '${_name(e.key)} ${formatPoints(e.value)}')
+            .join(' · ');
         content = Column(
           key: ValueKey('board${r.board}'),
           mainAxisSize: MainAxisSize.min,
@@ -590,7 +726,7 @@ class _Narration extends StatelessWidget {
             Text('BOARD ${r.board + 1} SUR 3', style: body(11.5, color: Palette.gold, weight: FontWeight.w800).copyWith(letterSpacing: 1.4)),
             const SizedBox(height: 2),
             Text(
-              '$names ${r.winners.length > 1 ? 'partagent' : r.winners.first == game.hero.id ? 'gagnez' : 'gagne'} ${formatCoins(r.amount)}',
+              r.winners.length > 1 ? 'Point partagé : $names' : 'Point pour $names',
               style: display(19),
               textAlign: TextAlign.center,
             ),
@@ -600,8 +736,12 @@ class _Narration extends StatelessWidget {
                   : r.handName,
               style: body(13.5, color: Palette.textLo),
             ),
+            const SizedBox(height: 2),
+            Text('Score : $score', style: body(13, color: Palette.textHi), textAlign: TextAlign.center),
           ],
         );
+      case Phase.revealPot:
+        content = _potLines(const ValueKey('pot'));
       case Phase.summary:
         final uncontested = h.events.whereType<UncontestedWinEvent>();
         if (uncontested.isNotEmpty) {
@@ -609,26 +749,7 @@ class _Narration extends StatelessWidget {
           final who = e.id == game.hero.id ? 'Vous remportez' : '${game.seatById(e.id).name} remporte';
           content = Text('$who ${formatCoins(e.amount)} sans abattage', style: display(17), key: const ValueKey('sans'), textAlign: TextAlign.center);
         } else {
-          content = Row(
-            key: const ValueKey('resume'),
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              for (final r in game.reveals)
-                Expanded(
-                  child: Column(
-                    children: [
-                      Text('Board ${r.board + 1}', style: body(11.5, color: Palette.textLo)),
-                      Text(
-                        r.winners.map((id) => id == game.hero.id ? 'Vous' : game.seatById(id).name).join(', '),
-                        style: body(14, color: r.winners.contains(game.hero.id) ? Palette.gold : Palette.textHi, weight: FontWeight.w800),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(r.handName, style: body(11.5, color: Palette.textLo)),
-                    ],
-                  ),
-                ),
-            ],
-          );
+          content = _potLines(const ValueKey('resume'));
         }
     }
     return AnimatedSize(
@@ -685,7 +806,7 @@ class _ActionBarState extends State<_ActionBar> {
   @override
   Widget build(BuildContext context) {
     final h = game.hand!;
-    if (game.phase == Phase.revealCards || game.phase == Phase.revealBoard) {
+    if (game.phase == Phase.revealCards || game.phase == Phase.revealBoard || game.phase == Phase.revealPot) {
       return _wrap(TextButton(
         onPressed: game.skipReveal,
         child: Text('Passer l\'abattage', style: body(14, color: Palette.textLo)),

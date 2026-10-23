@@ -34,8 +34,8 @@ void main() {
   test('une main gagnée fait avancer points de ligue et missions', () {
     final p = PlayerProfile.fresh(clock: () => DateTime(2026, 10, 21));
     final room = rooms[1]; // ×2
-    final pts = p.recordHand(const HandOutcome(boardsWon: 3, bestWinningCategory: 6, scooped: true, net: 500), room);
-    expect(pts, (3 * 10 + 15) * 2);
+    final pts = p.recordHand(const HandOutcome(boardsWon: 3, bestWinningCategory: 6, scooped: true, potWon: true, net: 500), room);
+    expect(pts, (3 * 10 + 20 + 15) * 2);
     expect(p.weeklyPoints, pts);
     expect(p.missions.firstWhere((m) => m.kind == 'hands').progress, 1);
     expect(p.weeklyRanking().where((e) => e.me).single.points, pts);
@@ -67,7 +67,7 @@ void main() {
       if (g.phase == Phase.summary && g.heroBroke) break;
     }
     expect(g.handNumber, greaterThan(5));
-    expect(phasesSeen, containsAll([Phase.betting, Phase.revealCards, Phase.revealBoard, Phase.summary]));
+    expect(phasesSeen, containsAll([Phase.betting, Phase.revealCards, Phase.revealBoard, Phase.revealPot, Phase.summary]));
     expect(boardsRevealed, {0, 1, 2});
     g.dispose();
     // Les bots changent quand ils sont ruinés : on vérifie seulement que le joueur n'a ni gagné ni perdu de jetons en route.

@@ -32,8 +32,17 @@ class Mission {
 
 /// Résultat d'une main pour le joueur, transmis par la table.
 class HandOutcome {
-  const HandOutcome({required this.boardsWon, required this.bestWinningCategory, required this.scooped, required this.net});
+  const HandOutcome({
+    required this.boardsWon,
+    required this.bestWinningCategory,
+    required this.scooped,
+    required this.net,
+    this.potWon = false,
+  });
   final int boardsWon;
+
+  /// Le joueur a remporté le pot (seul ou à égalité de points).
+  final bool potWon;
 
   /// Meilleure catégorie (0 = hauteur … 8 = quinte flush) parmi les boards gagnés, -1 si aucun.
   final int bestWinningCategory;
@@ -239,9 +248,10 @@ class PlayerProfile extends ChangeNotifier {
 
   // ---------- Fin de main ----------
 
-  /// Points de ligue d'une main : 10 par board gagné, 15 de plus pour une rafle, × multiplicateur de la salle.
+  /// Points de ligue d'une main : 10 par board gagné, 20 pour le pot, 15 de plus pour une rafle,
+  /// le tout × multiplicateur de la salle.
   static int leaguePointsFor(HandOutcome o, Room room) =>
-      (o.boardsWon * 10 + (o.scooped ? 15 : 0)) * room.leagueMultiplier;
+      (o.boardsWon * 10 + (o.potWon ? 20 : 0) + (o.scooped ? 15 : 0)) * room.leagueMultiplier;
 
   /// Enregistre une main jouée ; renvoie les points de ligue gagnés.
   int recordHand(HandOutcome o, Room room) {

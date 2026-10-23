@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { type Card, newDeck, parseCards, seededRng } from '../src/cards.ts';
 import { type Action, OmahaHand, type SeatInput } from '../src/game.ts';
+import { boardPoints, potWinners } from '../src/pots.ts';
 import { chooseBotAction, BOT_PROFILES } from '../src/bot.ts';
 
 const rng = seededRng(42);
@@ -57,8 +58,8 @@ test('tout le monde se couche : le dernier joueur ramasse le pot', () => {
   assert.equal(totalChips(h), 300);
 });
 
-test('le pot est partagé en trois tiers, un par board', () => {
-  // J1 gagne les boards 1 et 2 (brelan d'as), J2 gagne le board 3 (couleur à cœur).
+test('2 boards sur 3 remportent tout le pot', () => {
+  // J1 gagne les boards 1 et 2 (brelan d'as), J2 gagne le board 3 (couleur à cœur) : 2 points contre 1.
   const deck = stackedDeck(
     ['As Ad 2c 3d 4c 5d', 'Kh Qh 2s 3s 4s 5s'],
     ['Ac 7s 8d', 'Ah 7c 8c', '2h 9h Jc'],
@@ -73,11 +74,21 @@ test('le pot est partagé en trois tiers, un par board', () => {
     h.act('J1', { type: 'check' });
   }
   assert.ok(h.isComplete);
-  // Pot de 12 : 4 par board.
-  assert.equal(h.winnings.get('J1'), 8);
-  assert.equal(h.winnings.get('J2'), 4);
-  assert.equal(h.player('J1').stack, 102);
-  assert.equal(h.player('J2').stack, 98);
+  assert.equal(h.winnings.get('J1'), 12);
+  assert.equal(h.winnings.get('J2'), undefined);
+  assert.equal(h.player('J1').stack, 106);
+  assert.equal(h.player('J2').stack, 94);
+});
+
+test('points par board et partage seulement en cas d\'égalité de points', () => {
+  const order = ['A', 'B', 'C'];
+  const win = (...boards: string[][]) => potWinners(boardPoints(boards), order);
+  assert.deepEqual(win(['A'], ['A'], ['B']), ['A'], '2 points contre 1');
+  assert.deepEqual(win(['A'], ['B'], ['A', 'B']), ['A', 'B'], '2 joueurs à 1,5 point');
+  assert.deepEqual(win(['A'], ['B'], ['C']), ['A', 'B', 'C'], '3 joueurs à 1 point');
+  assert.deepEqual(win(['A'], ['B'], ['A', 'B']), ['A', 'B'], '1,5 / 1,5 / 0');
+  assert.deepEqual(win(['A'], ['B', 'C'], ['B', 'C']), ['A', 'B', 'C'], '1 / 0,5 + 0,5 / 0,5 + 0,5 : 3 joueurs à 1 point');
+  assert.deepEqual(win(['A', 'B'], ['C'], ['C']), ['C'], '0,5 / 0,5 / 2');
 });
 
 test('pots annexes avec plusieurs tapis', () => {

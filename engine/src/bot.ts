@@ -19,7 +19,7 @@ export const BOT_PROFILES = {
 
 /**
  * Part du pot que la main remporte en moyenne contre `opponents` mains aléatoires,
- * en complétant les 3 boards au hasard. Chaque board vaut un tiers.
+ * en complétant les 3 boards au hasard. Chaque board vaut 1 point ; le meilleur total prend le pot.
  */
 export function estimateEquity(
   hole: readonly Card[],
@@ -32,6 +32,8 @@ export function estimateEquity(
   const rest = newDeck().filter((c) => !known.has(c));
   const missing = 5 - boards[0].length;
   const needed = opponents * HOLE_CARDS + missing * BOARDS;
+  const points = new Array<number>(opponents + 1);
+  const scores = new Array<number>(opponents + 1);
   let total = 0;
   for (let s = 0; s < samples; s++) {
     // Tirage partiel de Fisher-Yates : seules les `needed` premières cartes sont mélangées.
@@ -42,22 +44,17 @@ export function estimateEquity(
     let k = 0;
     const opp: Card[][] = [];
     for (let o = 0; o < opponents; o++) opp.push(rest.slice(k, (k += HOLE_CARDS)));
+    points.fill(0);
     for (const b of boards) {
       const full = [...b, ...rest.slice(k, (k += missing))];
-      const mine = bestOmahaScore(hole, full);
-      let best = mine;
-      let ties = 1;
-      for (const h of opp) {
-        const sc = bestOmahaScore(h, full);
-        if (sc > best) {
-          best = sc;
-          ties = 0;
-          break;
-        }
-        if (sc === best) ties++;
-      }
-      if (best === mine && ties > 0) total += 1 / ties / BOARDS;
+      scores[0] = bestOmahaScore(hole, full);
+      for (let o = 0; o < opponents; o++) scores[o + 1] = bestOmahaScore(opp[o], full);
+      const best = Math.max(...scores);
+      const ties = scores.filter((x) => x === best).length;
+      for (let i = 0; i <= opponents; i++) if (scores[i] === best) points[i] += 1 / ties;
     }
+    const top = Math.max(...points);
+    if (points[0] === top) total += 1 / points.filter((x) => Math.abs(x - top) < 1e-9).length;
   }
   return total / samples;
 }

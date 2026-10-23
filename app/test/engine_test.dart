@@ -6,6 +6,7 @@ import 'package:omaha_3_boards/engine/cards.dart';
 import 'package:omaha_3_boards/engine/evaluator.dart';
 import 'package:omaha_3_boards/engine/game.dart';
 import 'package:omaha_3_boards/engine/omaha.dart';
+import 'package:omaha_3_boards/engine/pots.dart';
 
 // Mêmes cas que engine/test/*.test.ts : les deux moteurs doivent donner les mêmes résultats.
 
@@ -66,7 +67,7 @@ void main() {
     expect([h.legalActions().raiseMin, h.legalActions().raiseMax], [12, 23]);
   });
 
-  test('le pot est partagé en trois tiers, un par board', () {
+  test('2 boards sur 3 remportent tout le pot', () {
     final deck = stackedDeck(
       ['As Ad 2c 3d 4c 5d', 'Kh Qh 2s 3s 4s 5s'],
       ['Ac 7s 8d', 'Ah 7c 8c', '2h 9h Jc'],
@@ -80,7 +81,17 @@ void main() {
       h.act('J2', const PlayerAction.check());
       h.act('J1', const PlayerAction.check());
     }
-    expect(h.winnings, {'J1': 8, 'J2': 4});
+    expect(h.winnings, {'J1': 12});
+  });
+
+  test('points par board et partage seulement en cas d\'égalité de points', () {
+    const order = ['A', 'B', 'C'];
+    List<String> win(List<List<String>> boards) => potWinners(boardPoints(boards), order);
+    expect(win([['A'], ['A'], ['B']]), ['A']);
+    expect(win([['A'], ['B'], ['A', 'B']]), ['A', 'B'], reason: '2 joueurs à 1,5 point');
+    expect(win([['A'], ['B'], ['C']]), ['A', 'B', 'C'], reason: '3 joueurs à 1 point');
+    expect(win([['A'], ['B', 'C'], ['B', 'C']]), ['A', 'B', 'C']);
+    expect(win([['A', 'B'], ['C'], ['C']]), ['C']);
   });
 
   test('pots annexes avec plusieurs tapis', () {

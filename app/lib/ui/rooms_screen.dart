@@ -18,13 +18,14 @@ Room recommendedRoom(PlayerProfile p) {
 }
 
 /// Ouvre une table si le joueur a le niveau et les pièces, sinon explique ce qui manque.
-Future<void> openRoom(BuildContext context, Room room) async {
+/// [extraCoins] compte les jetons que le joueur récupérera en quittant sa table.
+Future<bool> openRoom(BuildContext context, Room room, {int extraCoins = 0}) async {
   final p = ProfileScope.read(context);
   if (p.level < room.minLevel) {
     toast(context, 'Salle ${room.name} : niveau ${room.minLevel} requis');
-    return;
+    return false;
   }
-  if (p.coins < room.buyIn) {
+  if (p.coins + extraCoins < room.buyIn) {
     final goShop = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -32,7 +33,7 @@ Future<void> openRoom(BuildContext context, Room room) async {
         title: Text('Pas assez de pièces', style: display(22)),
         content: Text(
           'La cave de la salle ${room.name} est de ${formatCoins(room.buyIn)} pièces. '
-          'Il vous en manque ${formatCoins(room.buyIn - p.coins)}.',
+          'Il vous en manque ${formatCoins(room.buyIn - p.coins - extraCoins)}.',
           style: body(15, weight: FontWeight.w500),
         ),
         actions: [
@@ -44,17 +45,110 @@ Future<void> openRoom(BuildContext context, Room room) async {
         ],
       ),
     );
-    if (goShop == true && context.mounted) AppShellState.of(context).goTo(3);
-    return;
+    // Depuis une table il n’y a pas d’onglets : seul l’accueil sait ouvrir la boutique.
+    if (goShop == true && context.mounted) context.findAncestorStateOfType<AppShellState>()?.goTo(3);
+    return false;
   }
-  await Navigator.of(context).push(PageRouteBuilder(
+  return true;
+}
+
+/// Lance la table de [room] (après les vérifications d'[openRoom]) ; [replace] remplace la table en cours.
+Future<void> pushTable(BuildContext context, Room room, {bool replace = false}) {
+  final route = PageRouteBuilder<void>(
     transitionDuration: const Duration(milliseconds: 350),
     pageBuilder: (context, a, b) => TableScreen(room: room),
     transitionsBuilder: (context, a, b, child) => FadeTransition(
       opacity: a,
       child: ScaleTransition(scale: Tween(begin: 1.06, end: 1.0).animate(a), child: child),
     ),
-  ));
+  );
+  final nav = Navigator.of(context);
+  return replace ? nav.pushReplacement(route) : nav.push(route);
+}
+
+/// Vérifie puis ouvre la table de [room].
+Future<void> playRoom(BuildContext context, Room room) async {
+  if (await openRoom(context, room) && context.mounted) await pushTable(context, room);
+}
+
+/// Feuille de choix de salle : niveau des blindes, cave et multiplicateur de ligue.
+Future<Room?> pickRoom(BuildContext context, {Room? current}) {
+  final p = ProfileScope.read(context);
+  return showModalBottomSheet<Room>(
+    context: context,
+    backgroundColor: Palette.panel,
+    showDragHandle: true,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    builder: (context) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Choisir les blindes', style: display(24)),
+            Text('Plus les blindes sont hautes, plus la ligue rapporte.',
+                style: body(13.5, color: Palette.textLo, weight: FontWeight.w500)),
+            const SizedBox(height: 12),
+            for (final r in rooms)
+              _RoomRow(
+                room: r,
+                unlocked: p.level >= r.minLevel,
+                selected: r == current,
+                onTap: () => Navigator.pop(context, r),
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _RoomRow extends StatelessWidget {
+  const _RoomRow({required this.room, required this.unlocked, required this.selected, required this.onTap});
+  final Room room;
+  final bool unlocked;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Pressable(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? room.color.withValues(alpha: 0.18) : Colors.black12,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: selected ? room.color : Palette.panelLine, width: selected ? 2 : 1),
+          ),
+          child: Row(
+            children: [
+              Icon(unlocked ? Icons.casino_rounded : Icons.lock_rounded, color: unlocked ? room.color : Palette.textLo, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(room.name, style: display(18, color: unlocked ? Palette.textHi : Palette.textLo)),
+                    Text(
+                      unlocked
+                          ? 'Blindes ${formatCoins(room.smallBlind)} / ${formatCoins(room.bigBlind)} · cave ${formatCoins(room.buyIn)}'
+                          : 'Niveau ${room.minLevel} requis',
+                      style: body(12.5, color: Palette.textLo),
+                    ),
+                  ],
+                ),
+              ),
+              Text('×${room.leagueMultiplier}', style: display(18, color: unlocked ? room.color : Palette.textLo)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class RoomsScreen extends StatelessWidget {
@@ -88,7 +182,7 @@ class _RoomCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Pressable(
-      onTap: () => openRoom(context, room),
+      onTap: () => playRoom(context, room),
       child: Panel(
         padding: EdgeInsets.zero,
         gradient: LinearGradient(
@@ -143,7 +237,7 @@ class _RoomCard extends StatelessWidget {
                     color: affordable ? Palette.mint : const Color(0xFF5B6B84),
                     shade: affordable ? const Color(0xFF1F9A5F) : const Color(0xFF3B4659),
                     textColor: affordable ? const Color(0xFF06301B) : Palette.textHi,
-                    onTap: () => openRoom(context, room),
+                    onTap: () => playRoom(context, room),
                   ),
                 )
               else

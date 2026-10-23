@@ -1,6 +1,6 @@
 import { type Card, type Rng, newDeck, shuffle } from './cards.ts';
 import { bestOmahaHand, type BestHand } from './omaha.ts';
-import { buildPots, splitAmong, splitInThirds, uncalledBet, type Pot } from './pots.ts';
+import { boardPoints, buildPots, potWinners, splitAmong, uncalledBet, type Pot } from './pots.ts';
 
 export const HOLE_CARDS = 6;
 export const BOARDS = 3;
@@ -50,7 +50,10 @@ export type GameEvent =
   | { type: 'street'; street: Street; boards: Card[][] }
   | { type: 'refund'; id: string; amount: number }
   | { type: 'showdown'; hands: Record<string, BestHand[]> }
-  | { type: 'board-win'; board: number; pot: number; winners: string[]; amount: number }
+  /** Gagnants d'un board pour un pot : ils se partagent le point du board. */
+  | { type: 'board-win'; board: number; pot: number; winners: string[] }
+  /** Le pot va au(x) joueur(s) qui ont le plus de points (en soixantièmes : 60 = 1 board). */
+  | { type: 'pot-win'; pot: number; winners: string[]; amount: number; points: Record<string, number> }
   | { type: 'win-uncontested'; id: string; amount: number };
 
 export interface HandOptions {
@@ -295,14 +298,17 @@ export class OmahaHand {
     const pots: Pot[] = buildPots(this.players.map((p) => ({ id: p.id, amount: p.totalBet, folded: p.folded })));
     const order = this.seatOrderFromButton();
     pots.forEach((pot, potIndex) => {
-      const thirds = splitInThirds(pot.amount);
-      thirds.forEach((amount, board) => {
-        if (amount === 0) return;
+      // Chaque board vaut 1 point ; le meilleur total remporte tout le pot, partage seulement en cas d'égalité.
+      const boardWinners = this.boards.map((_, board) => {
         const best = Math.max(...pot.eligible.map((id) => hands[id][board].score));
         const winners = order.filter((id) => pot.eligible.includes(id) && hands[id][board].score === best);
-        for (const [id, won] of splitAmong(amount, winners)) this.credit(id, won);
-        this.events.push({ type: 'board-win', board, pot: potIndex, winners, amount });
+        this.events.push({ type: 'board-win', board, pot: potIndex, winners });
+        return winners;
       });
+      const points = boardPoints(boardWinners);
+      const winners = potWinners(points, order);
+      for (const [id, won] of splitAmong(pot.amount, winners)) this.credit(id, won);
+      this.events.push({ type: 'pot-win', pot: potIndex, winners, amount: pot.amount, points: Object.fromEntries(points) });
     });
     this.complete();
   }
