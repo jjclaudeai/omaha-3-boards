@@ -1,27 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'ui/table_screen.dart';
+import 'state/profile.dart';
+import 'state/profile_scope.dart';
+import 'ui/app_shell.dart';
+import 'ui/theme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  runApp(const OmahaApp());
+  final profile = await PlayerProfile.load();
+  runApp(OmahaApp(profile: profile));
 }
 
 class OmahaApp extends StatelessWidget {
-  const OmahaApp({super.key});
+  const OmahaApp({super.key, required this.profile});
+  final PlayerProfile profile;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Omaha 3 boards',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1B5E3A), brightness: Brightness.dark),
-        useMaterial3: true,
+    return ProfileScope(
+      profile: profile,
+      child: MaterialApp(
+        title: 'Omaha 3 boards',
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(),
+        home: const AppShell(),
       ),
-      home: const TableScreen(),
     );
   }
 }

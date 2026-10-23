@@ -12,9 +12,24 @@ const suitColors = [
 const rankLabels = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'V', 'D', 'R', 'A'];
 
 class PlayingCard extends StatelessWidget {
-  const PlayingCard({super.key, this.card, required this.width, this.faceUp = true, this.dimmed = false, this.glow = false});
+  const PlayingCard({
+    super.key,
+    this.card,
+    required this.width,
+    this.faceUp = true,
+    this.dimmed = false,
+    this.glow = false,
+    this.lift = false,
+    this.back,
+  });
 
   final CardId? card;
+
+  /// Soulève la carte (abattage : les 2 cartes de la main gagnante).
+  final bool lift;
+
+  /// Couleurs du dos de carte choisi en boutique.
+  final List<Color>? back;
   final double width;
   final bool faceUp;
   final bool dimmed;
@@ -30,8 +45,8 @@ class PlayingCard extends StatelessWidget {
       face = Container(
         decoration: BoxDecoration(
           borderRadius: radius,
-          gradient: const LinearGradient(
-            colors: [Color(0xFF8E1B2C), Color(0xFF5C0F1C)],
+          gradient: LinearGradient(
+            colors: back ?? const [Color(0xFF8E1B2C), Color(0xFF5C0F1C)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -69,20 +84,25 @@ class PlayingCard extends StatelessWidget {
         ),
       );
     }
-    return AnimatedOpacity(
+    return AnimatedSlide(
       duration: const Duration(milliseconds: 250),
-      opacity: dimmed ? 0.35 : 1,
+      curve: Curves.easeOutBack,
+      offset: lift ? const Offset(0, -0.14) : Offset.zero,
+      child: AnimatedOpacity(
+      duration: const Duration(milliseconds: 250),
+      opacity: dimmed ? 0.38 : 1,
       child: Container(
         width: width,
         height: h,
         decoration: BoxDecoration(
           borderRadius: radius,
           boxShadow: [
-            if (glow) const BoxShadow(color: Color(0xFFFFD54F), blurRadius: 10, spreadRadius: 1),
+            if (glow) const BoxShadow(color: Color(0xFFFFD54F), blurRadius: 12, spreadRadius: 2),
             const BoxShadow(color: Colors.black38, blurRadius: 3, offset: Offset(0, 1.5)),
           ],
         ),
         child: face,
+      ),
       ),
     );
   }
