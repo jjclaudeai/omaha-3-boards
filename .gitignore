@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+app/build/
+app/.dart_tool/
+*.iml
+app/.flutter-plugins-dependencies

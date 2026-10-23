@@ -1,0 +1,12 @@
+{
+  "name": "@omaha3/engine",
+  "version": "0.1.0",
+  "description": "Moteur de règles du poker Omaha 6 cartes à 3 boards (Pot-Limit)",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "simulate": "node scripts/simulate.ts"
+  }
+}
