@@ -4,7 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../state/catalog.dart';
+import '../../state/profile_scope.dart';
 import '../theme.dart';
+
+/// Vibrations au toucher, réglables dans Mon compte.
+bool hapticsEnabled = true;
 
 /// Pièce dorée dessinée (pas d'émoji : rendu identique partout).
 class CoinIcon extends StatelessWidget {
@@ -109,7 +113,7 @@ class _PressableState extends State<Pressable> {
         onTapUp: widget.enabled ? (_) => setState(() => _down = false) : null,
         onTap: widget.enabled
             ? () {
-                HapticFeedback.selectionClick();
+                if (hapticsEnabled) HapticFeedback.selectionClick();
                 widget.onTap();
               }
             : null,
@@ -309,17 +313,60 @@ class _ShieldPainter extends CustomPainter {
 
 /// Avatar rond avec l'initiale, entouré de l'anneau de progression du niveau.
 class Avatar extends StatelessWidget {
-  const Avatar({super.key, required this.name, this.size = 52, this.progress, this.level});
+  const Avatar({
+    super.key,
+    required this.name,
+    this.size = 52,
+    this.progress,
+    this.level,
+    this.avatarId,
+    this.photo,
+    this.frame,
+  });
   final String name;
   final double size;
   final double? progress;
   final int? level;
 
+  /// Avatar dessiné choisi ; sans lui, l'initiale du pseudo sur une couleur tirée du nom.
+  final String? avatarId;
+
+  /// Photo de profil : prime sur l'avatar dessiné.
+  final Uint8List? photo;
+  final String? frame;
+
   static const _colors = [Color(0xFFE76F51), Color(0xFF2A9D8F), Color(0xFF8E7DFF), Color(0xFFF4A261), Color(0xFF4CC9F0), Color(0xFFEF476F)];
 
   @override
   Widget build(BuildContext context) {
+    final preset = avatarId == null ? null : avatars.where((a) => a.id == avatarId).firstOrNull;
+    final ring = frame == null ? null : frames.where((f) => f.id == frame && f.id != 'aucun').firstOrNull;
     final color = _colors[name.codeUnits.fold(0, (a, b) => a + b) % _colors.length];
+    final Widget inner;
+    if (photo != null) {
+      inner = ClipOval(child: Image.memory(photo!, width: size, height: size, fit: BoxFit.cover, gaplessPlayback: true));
+    } else if (preset != null) {
+      inner = Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(colors: preset.colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+        ),
+        child: Icon(preset.icon, color: Colors.white, size: size * 0.55),
+      );
+    } else {
+      inner = Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(colors: [Color.lerp(color, Colors.white, 0.2)!, color]),
+        ),
+        alignment: Alignment.center,
+        child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: display(size * 0.48)),
+      );
+    }
     return SizedBox(
       width: size + 8,
       height: size + 8,
@@ -338,16 +385,17 @@ class Avatar extends StatelessWidget {
                 valueColor: const AlwaysStoppedAnimation(Palette.mint),
               ),
             ),
-          Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(colors: [Color.lerp(color, Colors.white, 0.2)!, color]),
+          if (ring != null && progress == null)
+            Container(
+              width: size + 7,
+              height: size + 7,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: SweepGradient(colors: [...ring.colors, ring.colors.first]),
+                boxShadow: [BoxShadow(color: ring.colors.first.withValues(alpha: 0.5), blurRadius: 8)],
+              ),
             ),
-            alignment: Alignment.center,
-            child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: display(size * 0.48)),
-          ),
+          inner,
           if (level != null)
             Positioned(
               bottom: -4,
@@ -356,13 +404,35 @@ class Avatar extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Palette.night,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Palette.mint, width: 1.5),
+                  border: Border.all(color: ring?.colors.first ?? Palette.mint, width: 1.5),
                 ),
-                child: Text('$level', style: display(12, color: Palette.mint)),
+                child: Text('$level', style: display(12, color: ring?.colors.first ?? Palette.mint)),
               ),
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Avatar du joueur lui-même, tel qu'il l'a réglé dans Mon compte.
+class MyAvatar extends StatelessWidget {
+  const MyAvatar({super.key, this.size = 52, this.showProgress = false, this.showLevel = true});
+  final double size;
+  final bool showProgress;
+  final bool showLevel;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = ProfileScope.of(context);
+    return Avatar(
+      name: p.name,
+      size: size,
+      avatarId: p.avatarId,
+      photo: p.photo,
+      frame: p.frame,
+      progress: showProgress ? p.levelProgress : null,
+      level: showLevel ? p.level : null,
     );
   }
 }

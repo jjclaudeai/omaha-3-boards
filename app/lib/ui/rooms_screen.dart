@@ -7,6 +7,7 @@ import 'app_shell.dart';
 import 'table_screen.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
+import 'widgets/reward_dialog.dart';
 
 /// Salle conseillée : la plus haute débloquée dont le joueur peut payer 2 caves, sinon Débutant.
 Room recommendedRoom(PlayerProfile p) {
@@ -63,7 +64,11 @@ Future<void> pushTable(BuildContext context, Room room, {bool replace = false}) 
     ),
   );
   final nav = Navigator.of(context);
-  return replace ? nav.pushReplacement(route) : nav.push(route);
+  if (replace) return nav.pushReplacement(route);
+  // Au retour à l'accueil, on fête les niveaux gagnés pendant la partie.
+  return nav.push(route).then((_) {
+    if (context.mounted) showLevelUps(context);
+  });
 }
 
 /// Vérifie puis ouvre la table de [room].

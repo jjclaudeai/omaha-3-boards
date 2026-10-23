@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../state/profile_scope.dart';
+import 'account_screen.dart';
 import 'home_screen.dart';
 import 'league_screen.dart';
 import 'rooms_screen.dart';
@@ -73,15 +74,18 @@ class _Header extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
       child: Row(
         children: [
-          Avatar(name: p.name, size: 44, progress: p.levelProgress, level: p.level),
+          Pressable(onTap: () => openAccount(context), child: const MyAvatar(size: 44, showProgress: true)),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
+            child: Pressable(
+              onTap: () => openAccount(context),
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(p.name, style: display(19), overflow: TextOverflow.ellipsis),
-                Text('Niveau ${p.level} · ligue ${p.league.name}', style: body(12.5, color: Palette.textLo)),
+                Text('Niveau ${p.level} · ligue ${p.league.name}${p.isVip ? ' · VIP' : ''}', style: body(12.5, color: Palette.textLo)),
               ],
+            ),
             ),
           ),
           CoinPill(amount: p.coins, onAdd: () => AppShellState.of(context).goTo(3)),

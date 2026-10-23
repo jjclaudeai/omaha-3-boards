@@ -2,8 +2,25 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../state/catalog.dart';
+import '../../state/profile_scope.dart';
 import '../theme.dart';
 import 'common.dart';
+
+/// Montre une fenêtre par niveau gagné (la récompense est déjà créditée).
+Future<void> showLevelUps(BuildContext context) async {
+  final p = ProfileScope.read(context);
+  for (int? l = p.takeLevelUp(); l != null && context.mounted; l = p.takeLevelUp()) {
+    await showReward(context, title: 'Niveau $l atteint !', subtitle: _unlockedAt(l), coins: levelUpReward(l));
+  }
+}
+
+String _unlockedAt(int level) {
+  final room = rooms.where((r) => r.minLevel == level).firstOrNull;
+  if (room != null) return 'Salle ${room.name} débloquée';
+  final items = allCosmetics.where((c) => c.minLevel == level && !c.vipOnly).length;
+  return items > 0 ? '$items nouveaux objets en boutique' : 'Récompense de niveau';
+}
 
 /// Fenêtre de récompense : pièces qui jaillissent et montant qui défile.
 Future<void> showReward(BuildContext context, {required String title, required int coins, String? subtitle}) {

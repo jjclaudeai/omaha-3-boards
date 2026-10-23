@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../engine/cards.dart';
@@ -15,12 +17,15 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = ProfileScope.of(context);
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      children: const [
-        _PlayCard(),
-        SizedBox(height: 14),
-        Row(
+      children: [
+        if (p.pendingWeeklyReward != null) ...[const _WeeklyRewardCard(), const SizedBox(height: 14)],
+        if (p.rescueAvailable) ...[const _RescueCard(), const SizedBox(height: 14)],
+        const _PlayCard(),
+        const SizedBox(height: 14),
+        const Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(child: _DailyBonusCard()),
@@ -28,11 +33,176 @@ class HomeScreen extends StatelessWidget {
             Expanded(child: _LeagueCard()),
           ],
         ),
-        SizedBox(height: 14),
-        _MissionsCard(),
-        SizedBox(height: 14),
-        _ShopTeaser(),
+        const SizedBox(height: 14),
+        const _ChestCard(),
+        const SizedBox(height: 14),
+        const _MissionsCard(),
+        const SizedBox(height: 14),
+        const _ShopTeaser(),
       ],
+    );
+  }
+}
+
+/// Gains de la semaine de ligue écoulée, à récupérer.
+class _WeeklyRewardCard extends StatelessWidget {
+  const _WeeklyRewardCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = ProfileScope.of(context);
+    final r = p.pendingWeeklyReward!;
+    return Panel(
+      gradient: const LinearGradient(colors: [Color(0xFF8C5E12), Color(0xFF3A2400)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      borderColor: Palette.gold,
+      child: Row(
+        children: [
+          const Icon(Icons.emoji_events_rounded, color: Palette.gold, size: 46),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${r.rank}${r.rank == 1 ? 'er' : 'e'} de la ligue ${r.league} !', style: display(19)),
+                Text('Tes gains de la semaine passée', style: body(13, color: const Color(0xFFFFE7B0))),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 110,
+            child: ChunkyButton(
+              label: '+${formatCoins(r.coins)}',
+              height: 44,
+              fontSize: 17,
+              onTap: () {
+                final won = p.claimWeeklyReward();
+                if (won > 0) showReward(context, title: 'Gains de ligue', subtitle: '${r.rank}e en ${r.league}', coins: won);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Plus assez de pièces pour une cave : un coup de pouce gratuit, ou la boutique.
+class _RescueCard extends StatelessWidget {
+  const _RescueCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = ProfileScope.of(context);
+    return Panel(
+      borderColor: Palette.sky,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Plus assez de pièces ?', style: display(19)),
+          Text('On t\'offre de quoi retourner à la table.', style: body(13, color: Palette.textLo)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: ChunkyButton(
+                  label: 'Coup de pouce +${formatCoins(rescueCoins)}',
+                  height: 44,
+                  fontSize: 16,
+                  color: Palette.sky,
+                  shade: const Color(0xFF2F6FB8),
+                  textColor: Palette.night,
+                  onTap: () {
+                    final won = p.claimRescue();
+                    if (won > 0) showReward(context, title: 'Coup de pouce', subtitle: 'Bonne chance à la table !', coins: won);
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 100,
+                child: ChunkyButton(label: 'Boutique', height: 44, fontSize: 16, onTap: () => AppShellState.of(context).goTo(3)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Coffre gratuit toutes les 4 heures, avec compte à rebours.
+class _ChestCard extends StatefulWidget {
+  const _ChestCard();
+
+  @override
+  State<_ChestCard> createState() => _ChestCardState();
+}
+
+class _ChestCardState extends State<_ChestCard> {
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = ProfileScope.of(context);
+    final wait = p.chestWait;
+    final ready = wait == Duration.zero;
+    String two(int n) => n.toString().padLeft(2, '0');
+    return Panel(
+      padding: const EdgeInsets.all(14),
+      gradient: ready ? const LinearGradient(colors: [Color(0xFF7A4A12), Palette.panel], begin: Alignment.centerLeft, end: Alignment.centerRight) : null,
+      borderColor: ready ? Palette.gold : null,
+      child: Row(
+        children: [
+          AnimatedScale(
+            scale: ready ? 1.1 : 1,
+            duration: const Duration(milliseconds: 400),
+            child: Icon(ready ? Icons.redeem_rounded : Icons.lock_clock_rounded, color: ready ? Palette.gold : Palette.textLo, size: 42),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Coffre gratuit', style: display(18)),
+                Text(
+                  ready
+                      ? '${formatCoins(freeChestMin)} à ${formatCoins(freeChestMax)} pièces'
+                      : 'Prêt dans ${wait.inHours} h ${two(wait.inMinutes % 60)} min ${two(wait.inSeconds % 60)} s',
+                  style: body(12.5, color: Palette.textLo),
+                ),
+                if (!p.isVip) Text('2 fois plus souvent en VIP', style: body(11.5, color: const Color(0xFFB98CFF))),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 96,
+            child: ChunkyButton(
+              label: ready ? 'Ouvrir' : 'Bientôt',
+              height: 42,
+              fontSize: 17,
+              enabled: ready,
+              onTap: () {
+                final won = p.openChest();
+                if (won > 0) showReward(context, title: 'Coffre ouvert', subtitle: 'Prochain dans ${p.chestInterval.inHours} h', coins: won);
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -176,7 +346,7 @@ class _DailyBonusCard extends StatelessWidget {
             children: [
               const CoinIcon(size: 20),
               const SizedBox(width: 6),
-              Text(formatCoins(dailyRewards[day - 1]), style: display(20, color: Palette.gold)),
+              Text(formatCoins(p.dailyRewardFor(day)), style: display(20, color: Palette.gold)),
             ],
           ),
           const SizedBox(height: 10),
@@ -335,7 +505,7 @@ class _ShopTeaser extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Offre de bienvenue', style: display(19)),
-                  Text('${formatCoins(welcomeOffer.coins)} pièces + dos de cartes Or royal',
+                  Text('${formatCoins(welcomeOffer.coins)} pièces + dos Or royal et cadre Or',
                       style: body(13, color: const Color(0xFFE2D4FF))),
                 ],
               ),

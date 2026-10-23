@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../engine/cards.dart';
+import '../state/catalog.dart';
+import 'cosmetics.dart';
 
 /// Jeu « 4 couleurs » : avec 3 boards, distinguer carreau et cœur d'un coup d'œil aide à voir les couleurs.
 const suitColors = [
@@ -28,8 +30,8 @@ class PlayingCard extends StatelessWidget {
   /// Soulève la carte (abattage : les 2 cartes de la main gagnante).
   final bool lift;
 
-  /// Couleurs du dos de carte choisi en boutique.
-  final List<Color>? back;
+  /// Dos de carte choisi en boutique.
+  final Cosmetic? back;
   final double width;
   final bool faceUp;
   final bool dimmed;
@@ -42,20 +44,7 @@ class PlayingCard extends StatelessWidget {
     final c = card;
     Widget face;
     if (!faceUp || c == null) {
-      face = Container(
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          gradient: LinearGradient(
-            colors: back ?? const [Color(0xFF8E1B2C), Color(0xFF5C0F1C)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          border: Border.all(color: Colors.white, width: width * 0.05),
-        ),
-        child: Center(
-          child: Icon(Icons.diamond_outlined, color: Colors.white24, size: width * 0.5),
-        ),
-      );
+      face = CardBackFace(item: back ?? cardBacks.first, width: width, radius: radius);
     } else {
       final color = suitColors[suitOf(c)];
       face = Container(

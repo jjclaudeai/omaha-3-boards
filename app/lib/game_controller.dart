@@ -73,6 +73,11 @@ class GameController extends ChangeNotifier {
       seats.add(_newBot());
     }
     _button = _rng.nextInt(seats.length);
+    if (profile.fastReveal) {
+      revealPause = const Duration(milliseconds: 600);
+      boardPause = const Duration(milliseconds: 1200);
+      summaryPause = const Duration(milliseconds: 2000);
+    }
   }
 
   final Room room;
@@ -100,6 +105,9 @@ class GameController extends ChangeNotifier {
 
   /// Points de ligue gagnés sur la dernière main.
   int lastLeaguePoints = 0;
+
+  /// Commission prélevée sur le gain du joueur à la dernière main (pot gagné après le flop).
+  int lastRake = 0;
   int handNumber = 0;
   bool autoNext = true;
 
@@ -170,6 +178,7 @@ class GameController extends ChangeNotifier {
     potResults = [];
     revealIndex = -1;
     lastLeaguePoints = 0;
+    lastRake = 0;
     phase = Phase.betting;
     handNumber++;
     hand = OmahaHand(
@@ -246,6 +255,7 @@ class GameController extends ChangeNotifier {
     for (final p in h.players) {
       seatById(p.id).stack = p.stack - (holding ? h.winnings[p.id] ?? 0 : 0);
     }
+    if (h.isComplete && !holding) hero.stack -= lastRake;
   }
 
   // ---------- Abattage board par board ----------
@@ -255,8 +265,6 @@ class GameController extends ChangeNotifier {
     _recordOutcome();
     if (h.showdownHands.isEmpty) {
       // Tout le monde s'est couché : pas d'abattage.
-      final e = h.events.whereType<UncontestedWinEvent>().first;
-      badges[e.id] = SeatBadge('+${formatAmount(e.amount)}', highlight: true);
       _finish();
       return;
     }
@@ -299,11 +307,8 @@ class GameController extends ChangeNotifier {
   void _revealPot() {
     phase = Phase.revealPot;
     revealIndex = -1;
-    final h = hand!;
     badges.removeWhere((k, v) => v.text != 'Couché');
-    for (final e in h.winnings.entries) {
-      badges[e.key] = SeatBadge('+${formatAmount(e.value)}', highlight: true);
-    }
+    _winBadges();
     _syncStacks();
     notifyListeners();
     _timer = Timer(boardPause, _finish);
@@ -318,19 +323,27 @@ class GameController extends ChangeNotifier {
     _timer?.cancel();
     phase = Phase.summary;
     revealIndex = -1;
-    final h = hand!;
     badges.removeWhere((k, v) => v.text != 'Couché');
-    for (final e in h.winnings.entries) {
-      badges[e.key] = SeatBadge('+${formatAmount(e.value)}', highlight: true);
-    }
+    _winBadges();
     _syncStacks();
     notifyListeners();
     if (autoNext && !heroBroke) _timer = Timer(summaryPause, startHand);
   }
 
+  /// Gains affichés sous les sièges, nets de la commission pour le joueur.
+  void _winBadges() {
+    for (final e in hand!.winnings.entries) {
+      final net = e.key == hero.id ? e.value - lastRake : e.value;
+      badges[e.key] = SeatBadge('+${formatAmount(net)}', highlight: true);
+    }
+  }
+
   void _recordOutcome() {
     final h = hand!;
     final me = h.players[0];
+    // La maison prélève sa commission sur le pot gagné, seulement si le flop a été vu.
+    final gross = h.winnings[me.id] ?? 0;
+    lastRake = gross > 0 && h.boards[0].isNotEmpty ? room.rakeOn(gross) : 0;
     final startStack = me.stack - (h.winnings[me.id] ?? 0) + me.totalBet;
     var won = 0, bestCat = -1;
     for (final e in h.events.whereType<BoardWinEvent>().where((e) => e.pot == 0)) {
@@ -346,7 +359,7 @@ class GameController extends ChangeNotifier {
     final potWon = uncontested || (mainPot.isNotEmpty && mainPot.first.winners.contains(me.id));
     final scooped = mainPot.isNotEmpty && (mainPot.first.points[me.id] ?? 0) == boardCount * point;
     lastLeaguePoints = profile.recordHand(
-      HandOutcome(boardsWon: won, bestWinningCategory: bestCat, scooped: scooped, potWon: potWon, net: me.stack - startStack),
+      HandOutcome(boardsWon: won, bestWinningCategory: bestCat, scooped: scooped, potWon: potWon, net: me.stack - lastRake - startStack),
       room,
     );
   }

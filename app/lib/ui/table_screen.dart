@@ -10,6 +10,7 @@ import '../game_controller.dart';
 import '../state/catalog.dart';
 import '../state/profile_scope.dart';
 import 'card_widget.dart';
+import 'cosmetics.dart';
 import 'rooms_screen.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
@@ -88,8 +89,8 @@ class _TableScreenState extends State<TableScreen> {
   Widget build(BuildContext context) {
     final g = game!;
     final profile = ProfileScope.of(context);
-    final felt = felts.firstWhere((f) => f.id == profile.felt);
-    final back = cardBacks.firstWhere((c) => c.id == profile.cardBack).colors;
+    final theme = profile.themeItem;
+    final back = profile.cardBackItem;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -99,7 +100,7 @@ class _TableScreenState extends State<TableScreen> {
         body: Container(
           decoration: BoxDecoration(
             gradient: RadialGradient(
-              colors: [Color.lerp(felt.colors.last, Palette.night, 0.55)!, const Color(0xFF060B12)],
+              colors: [Color.lerp(theme.colors.last, Palette.night, 0.55)!, const Color(0xFF060B12)],
               radius: 1.1,
             ),
           ),
@@ -108,7 +109,7 @@ class _TableScreenState extends State<TableScreen> {
               listenable: g,
               builder: (context, _) => _TableLook(
                 back: back,
-                felt: felt.colors,
+                theme: theme,
                 child: Column(
                   children: [
                     _TopBar(game: g, onLeave: _leave, onSwitchRoom: _switchRoom),
@@ -128,14 +129,14 @@ class _TableScreenState extends State<TableScreen> {
 
 /// Transmet le dos de cartes et le tapis choisis aux widgets de la table.
 class _TableLook extends InheritedWidget {
-  const _TableLook({required this.back, required this.felt, required super.child});
-  final List<Color> back;
-  final List<Color> felt;
+  const _TableLook({required this.back, required this.theme, required super.child});
+  final Cosmetic back;
+  final Cosmetic theme;
 
   static _TableLook of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<_TableLook>()!;
 
   @override
-  bool updateShouldNotify(_TableLook old) => old.back != back || old.felt != felt;
+  bool updateShouldNotify(_TableLook old) => old.back != back || old.theme != theme;
 }
 
 class _TopBar extends StatelessWidget {
@@ -216,14 +217,7 @@ class _Table extends StatelessWidget {
             right: 28,
             top: 36,
             bottom: 8,
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(w),
-                gradient: RadialGradient(colors: look.felt, radius: 0.9),
-                border: Border.all(color: const Color(0xFF4E342E), width: 9),
-                boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 18, spreadRadius: 2)],
-              ),
-            ),
+            child: TableFelt(theme: look.theme),
           ),
           Center(child: _Boards(game: game, cardWidth: boardCard)),
           for (var i = 1; i < game.seats.length; i++)
@@ -450,6 +444,11 @@ class _BotSeat extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (game.button == seatIndex) const _DealerButton(),
+                    Opacity(
+                      opacity: p.folded ? 0.45 : 1,
+                      child: Avatar(name: seat.name, size: 16, avatarId: avatars[seat.name.hashCode % avatars.length].id),
+                    ),
+                    const SizedBox(width: 2),
                     Text(seat.name,
                         style: body(13.5, color: p.folded ? Colors.white38 : Palette.textHi, weight: FontWeight.w800)),
                   ],
@@ -553,6 +552,8 @@ class _HeroStatus extends StatelessWidget {
       child: Row(
         children: [
           if (game.button == 0) const _DealerButton(),
+          const MyAvatar(size: 26, showLevel: false),
+          const SizedBox(width: 4),
           Expanded(
             flex: 2,
             child: Column(
@@ -699,6 +700,8 @@ class _Narration extends StatelessWidget {
               style: body(13.5, color: Palette.textLo),
             ),
         ],
+        if (game.lastRake > 0)
+          Text('Commission de la table : ${formatCoins(game.lastRake)}', style: body(11.5, color: Palette.textLo)),
       ],
     );
   }
@@ -795,7 +798,7 @@ class _ActionBarState extends State<_ActionBar> {
   GameController get game => widget.game;
 
   void _do(PlayerAction a) {
-    HapticFeedback.lightImpact();
+    if (game.profile.haptics) HapticFeedback.lightImpact();
     _raiseTo = null;
     game.heroAct(a);
   }

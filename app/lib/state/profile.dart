@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'catalog.dart';
+import 'rankings.dart';
 
 /// Une mission du jour : un objectif, une progression et une récompense.
 class Mission {
@@ -20,6 +21,7 @@ class Mission {
   String get label => switch (kind) {
         'hands' => 'Jouer $goal mains',
         'boards' => 'Gagner $goal boards',
+        'pots' => 'Remporter $goal pots',
         'flush' => 'Gagner un board avec une couleur ou mieux',
         'scoop' => 'Rafler les 3 boards d\'un même pot',
         _ => kind,
@@ -52,15 +54,36 @@ class HandOutcome {
   final int net;
 }
 
-/// Tout ce qui appartient au joueur : pièces, niveau, ligue, bonus, missions, cosmétiques.
+/// Récompense de fin de semaine de ligue, en attente d'être récupérée.
+class WeeklyReward {
+  const WeeklyReward({required this.rank, required this.league, required this.coins});
+  final int rank;
+  final String league;
+  final int coins;
+}
+
+/// Tout ce qui appartient au joueur : identité, pièces, niveau, ligue, bonus, missions, cosmétiques, réglages.
 /// Sauvegardé sur l'appareil ; le serveur en sera la référence quand les comptes existeront.
 class PlayerProfile extends ChangeNotifier {
   PlayerProfile._();
 
   static const _key = 'profil_v1';
-  static const startingCoins = 5000;
 
+  // Identité (page Mon compte)
   String name = 'Joueur';
+  String avatarId = 'as';
+
+  /// Photo de profil choisie dans la galerie ou prise avec l'appareil, en JPEG réduit.
+  Uint8List? photo;
+  String frame = 'aucun';
+  String bio = '';
+  String country = 'FR';
+  String city = '';
+  DateTime? birthDate;
+  String email = '';
+  DateTime createdAt = DateTime.now();
+
+  // Économie et progression
   int coins = startingCoins;
   int xp = 0;
   int leaguePoints = 0;
@@ -70,13 +93,32 @@ class PlayerProfile extends ChangeNotifier {
   int streak = 0;
   String missionsDay = '';
   List<Mission> missions = [];
-  Set<String> owned = {'bordeaux', 'vert'};
+  DateTime? lastChestAt;
+  DateTime? lastRescueAt;
+  DateTime? vipUntil;
+  WeeklyReward? pendingWeeklyReward;
+
+  /// Niveaux atteints dont la récompense n'a pas encore été montrée.
+  final List<int> pendingLevelUps = [];
+
+  // Cosmétiques (clés « famille:id »)
+  Set<String> owned = {...starterItems};
   String cardBack = 'bordeaux';
-  String felt = 'vert';
+  String theme = 'vert';
   bool welcomeBought = false;
+
+  // Statistiques
   int handsPlayed = 0;
   int boardsWon = 0;
+  int potsWon = 0;
+  int scoops = 0;
   int biggestWin = 0;
+  int bestLeagueIndex = 0;
+
+  // Réglages
+  bool haptics = true;
+  bool fastReveal = false;
+  bool notifications = true;
 
   /// Chiffres du jour et de la semaine : remplaçables dans les tests.
   DateTime Function() now = DateTime.now;
@@ -99,6 +141,7 @@ class PlayerProfile extends ChangeNotifier {
   static PlayerProfile fresh({DateTime Function()? clock}) {
     final p = PlayerProfile._();
     if (clock != null) p.now = clock;
+    p.createdAt = p.now();
     p._refreshPeriods();
     return p;
   }
@@ -108,7 +151,9 @@ class PlayerProfile extends ChangeNotifier {
   /// XP nécessaire pour passer du niveau [level] au suivant.
   static int xpForLevel(int level) => 150 + 75 * (level - 1);
 
-  int get level {
+  int get level => _levelOf(xp);
+
+  static int _levelOf(int xp) {
     var l = 1, rest = xp;
     while (rest >= xpForLevel(l)) {
       rest -= xpForLevel(l);
@@ -127,12 +172,47 @@ class PlayerProfile extends ChangeNotifier {
     return rest / xpForLevel(l);
   }
 
+  /// Ajoute de l'XP (+25 % en VIP) et crédite la récompense de chaque niveau franchi.
+  void _gainXp(int amount) {
+    final before = level;
+    xp += isVip ? (amount * 1.25).round() : amount;
+    for (var l = before + 1; l <= level; l++) {
+      coins += levelUpReward(l);
+      pendingLevelUps.add(l);
+    }
+  }
+
+  int? takeLevelUp() {
+    if (pendingLevelUps.isEmpty) return null;
+    final l = pendingLevelUps.removeAt(0);
+    notifyListeners();
+    return l;
+  }
+
+  // ---------- VIP ----------
+
+  bool get isVip => vipUntil != null && vipUntil!.isAfter(now());
+
+  int get vipDaysLeft => isVip ? vipUntil!.difference(now()).inHours ~/ 24 + 1 : 0;
+
+  void purchaseVip() {
+    final start = isVip ? vipUntil! : now();
+    vipUntil = start.add(const Duration(days: vipDays));
+    coins += vipPass.coins;
+    for (final c in allCosmetics.where((c) => c.vipOnly)) {
+      owned.add(itemKey(c));
+    }
+    _save();
+  }
+
   // ---------- Ligue ----------
 
-  int get leagueIndex {
+  int get leagueIndex => _leagueIndexFor(leaguePoints);
+
+  static int _leagueIndexFor(int points) {
     var i = 0;
     for (var k = 0; k < leagues.length; k++) {
-      if (leaguePoints >= leagues[k].threshold) i = k;
+      if (points >= leagues[k].threshold) i = k;
     }
     return i;
   }
@@ -146,31 +226,46 @@ class PlayerProfile extends ChangeNotifier {
     return (leaguePoints - league.threshold) / (next.threshold - league.threshold);
   }
 
-  /// Classement de la semaine dans la ligue : 29 adversaires simulés et le joueur.
-  /// Les scores des adversaires sont tirés d'une graine liée à la semaine : stables d'une ouverture à l'autre.
-  List<({String name, int points, bool me})> weeklyRanking() {
-    final rng = Random(weekId.hashCode ^ leagueIndex);
-    const names = [
-      'Lucie', 'Marco', 'Inès', 'Hugo', 'Nadia', 'Théo', 'Chloé', 'Samir', 'Jade', 'Louis', 'Emma', 'Yanis',
-      'Léa', 'Karim', 'Zoé', 'Noah', 'Manon', 'Rayan', 'Camille', 'Enzo', 'Sarah', 'Adam', 'Lina', 'Gabriel',
-      'Alice', 'Mehdi', 'Clara', 'Lucas', 'Anaïs',
-    ];
-    // Les adversaires « jouent » au fil de la semaine : leur score grandit avec le jour.
-    final dayOfWeek = now().weekday;
-    final scale = 40 + 25 * leagueIndex;
-    final list = [
-      for (final n in names) (name: n, points: (rng.nextInt(scale * 3) * dayOfWeek / 7).round(), me: false),
-      (name: name, points: weeklyPoints, me: true),
-    ]..sort((a, b) => b.points - a.points);
-    return list;
-  }
+  RankEntry _meEntry(int points) => RankEntry(
+        rank: 0,
+        name: name,
+        points: points,
+        avatarId: avatarId,
+        frame: frame,
+        level: level,
+        country: country,
+        me: true,
+      );
 
-  int get weeklyRank => weeklyRanking().indexWhere((e) => e.me) + 1;
+  /// Classement de la semaine dans la ligue du joueur.
+  List<RankEntry> weeklyRanking() => SimulatedPlayers.weekly(
+        weekId: weekId,
+        leagueIndex: leagueIndex,
+        weekday: now().weekday,
+        me: _meEntry(weeklyPoints),
+      );
+
+  int get weeklyRank => weeklyRanking().firstWhere((e) => e.me).rank;
+
+  /// Classement général sur les points de ligue de toujours.
+  List<RankEntry> globalRanking() => SimulatedPlayers.global(me: _meEntry(leaguePoints));
+
+  /// Classement des fortunes en pièces.
+  List<RankEntry> fortuneRanking() => SimulatedPlayers.fortune(me: _meEntry(coins));
 
   Duration get timeLeftInWeek {
     final n = now();
     final nextMonday = DateTime(n.year, n.month, n.day).add(Duration(days: 8 - n.weekday));
     return nextMonday.difference(n);
+  }
+
+  int claimWeeklyReward() {
+    final r = pendingWeeklyReward;
+    if (r == null) return 0;
+    pendingWeeklyReward = null;
+    coins += r.coins;
+    _save();
+    return r.coins;
   }
 
   // ---------- Bonus quotidien ----------
@@ -185,15 +280,53 @@ class PlayerProfile extends ChangeNotifier {
     return bonusAvailable ? base % 7 + 1 : ((streak - 1) % 7) + 1;
   }
 
+  /// Récompense du jour [day] de la série : doublée en VIP.
+  int dailyRewardFor(int day) => dailyRewards[day - 1] * (isVip ? 2 : 1);
+
   int claimDailyBonus() {
     if (!bonusAvailable) return 0;
     final day = bonusDay;
-    final reward = dailyRewards[day - 1];
+    final reward = dailyRewardFor(day);
     streak = day;
     lastBonusDay = _day(now());
     coins += reward;
     _save();
     return reward;
+  }
+
+  // ---------- Coffre gratuit et coup de pouce ----------
+
+  Duration get chestInterval => Duration(hours: isVip ? freeChestHours ~/ 2 : freeChestHours);
+
+  /// Temps restant avant le prochain coffre gratuit (zéro = disponible).
+  Duration get chestWait {
+    if (lastChestAt == null) return Duration.zero;
+    final left = lastChestAt!.add(chestInterval).difference(now());
+    return left.isNegative ? Duration.zero : left;
+  }
+
+  int openChest([Random? rng]) {
+    if (chestWait > Duration.zero) return 0;
+    final r = rng ?? Random();
+    // Arrondi à 50 pièces : des montants ronds se lisent mieux.
+    final reward = (freeChestMin + r.nextInt(freeChestMax - freeChestMin + 1)) ~/ 50 * 50;
+    lastChestAt = now();
+    coins += reward;
+    _save();
+    return reward;
+  }
+
+  /// Le joueur ne peut plus payer la moindre cave : on lui offre de quoi revenir à la table.
+  bool get rescueAvailable =>
+      coins < rooms.first.buyIn &&
+      (lastRescueAt == null || now().difference(lastRescueAt!) >= const Duration(hours: rescueCooldownHours));
+
+  int claimRescue() {
+    if (!rescueAvailable) return 0;
+    lastRescueAt = now();
+    coins += rescueCoins;
+    _save();
+    return rescueCoins;
   }
 
   // ---------- Missions ----------
@@ -202,7 +335,7 @@ class PlayerProfile extends ChangeNotifier {
     if (!m.done || m.claimed) return 0;
     m.claimed = true;
     coins += m.reward;
-    xp += 50;
+    _gainXp(50);
     _save();
     return m.reward;
   }
@@ -226,25 +359,54 @@ class PlayerProfile extends ChangeNotifier {
     coins += pack.coins;
     if (pack.id == welcomeOffer.id) {
       welcomeBought = true;
-      owned.add('royal');
+      owned.addAll({'cardBack:royal', 'frame:or'});
     }
     _save();
   }
 
+  bool owns(Cosmetic c) => owned.contains(itemKey(c));
+
+  /// Pourquoi l'objet n'est pas encore achetable, ou null s'il l'est.
+  String? lockReason(Cosmetic c) {
+    if (owns(c)) return null;
+    if (c.vipOnly) return 'Réservé VIP';
+    if (level < c.minLevel) return 'Niveau ${c.minLevel}';
+    return null;
+  }
+
   bool buyCosmetic(Cosmetic c) {
-    if (owned.contains(c.id)) return true;
-    if (!spend(c.price)) return false;
-    owned.add(c.id);
+    if (owns(c)) return true;
+    if (lockReason(c) != null || !spend(c.price)) return false;
+    owned.add(itemKey(c));
     _save();
     return true;
   }
 
+  bool isEquipped(Cosmetic c) => switch (c.kind) {
+        CosmeticKind.theme => theme == c.id,
+        CosmeticKind.cardBack => cardBack == c.id,
+        CosmeticKind.avatar => photo == null && avatarId == c.id,
+        CosmeticKind.frame => frame == c.id,
+      };
+
   void equip(Cosmetic c) {
-    if (!owned.contains(c.id)) return;
-    if (cardBacks.contains(c)) cardBack = c.id;
-    if (felts.contains(c)) felt = c.id;
+    if (!owns(c)) return;
+    switch (c.kind) {
+      case CosmeticKind.theme:
+        theme = c.id;
+      case CosmeticKind.cardBack:
+        cardBack = c.id;
+      case CosmeticKind.avatar:
+        avatarId = c.id;
+        photo = null;
+      case CosmeticKind.frame:
+        frame = c.id;
+    }
     _save();
   }
+
+  Cosmetic get themeItem => themes.firstWhere((t) => t.id == theme, orElse: () => themes.first);
+  Cosmetic get cardBackItem => cardBacks.firstWhere((t) => t.id == cardBack, orElse: () => cardBacks.first);
 
   // ---------- Fin de main ----------
 
@@ -258,11 +420,14 @@ class PlayerProfile extends ChangeNotifier {
     _refreshPeriods();
     handsPlayed++;
     boardsWon += o.boardsWon;
+    if (o.potWon) potsWon++;
+    if (o.scooped) scoops++;
     if (o.net > biggestWin) biggestWin = o.net;
-    xp += 5 + o.boardsWon * 10;
+    _gainXp(5 + o.boardsWon * 10);
     final pts = leaguePointsFor(o, room);
     leaguePoints += pts;
     weeklyPoints += pts;
+    bestLeagueIndex = max(bestLeagueIndex, leagueIndex);
     for (final m in missions) {
       if (m.claimed) continue;
       switch (m.kind) {
@@ -270,6 +435,8 @@ class PlayerProfile extends ChangeNotifier {
           m.progress++;
         case 'boards':
           m.progress += o.boardsWon;
+        case 'pots':
+          if (o.potWon) m.progress++;
         case 'flush':
           if (o.bestWinningCategory >= 5) m.progress = m.goal;
         case 'scoop':
@@ -293,6 +460,13 @@ class PlayerProfile extends ChangeNotifier {
   void _refreshPeriods() {
     final n = now();
     if (weekId != _week(n)) {
+      // Fin de semaine : la place obtenue dans la ligue rapporte des pièces, à récupérer à l'accueil.
+      if (weekId.isNotEmpty && weeklyPoints > 0) {
+        final finalRanking = SimulatedPlayers.weekly(weekId: weekId, leagueIndex: leagueIndex, weekday: 7, me: _meEntry(weeklyPoints));
+        final rank = finalRanking.firstWhere((e) => e.me).rank;
+        final reward = league.rewardForRank(rank);
+        if (reward > 0) pendingWeeklyReward = WeeklyReward(rank: rank, league: league.name, coins: reward);
+      }
       weekId = _week(n);
       weeklyPoints = 0;
     }
@@ -300,9 +474,11 @@ class PlayerProfile extends ChangeNotifier {
       missionsDay = _day(n);
       final rng = Random(missionsDay.hashCode);
       missions = [
-        Mission(kind: 'hands', goal: 10 + 5 * rng.nextInt(3), reward: 1000),
-        Mission(kind: 'boards', goal: 4 + rng.nextInt(4), reward: 1500),
-        rng.nextBool() ? Mission(kind: 'flush', goal: 1, reward: 2000) : Mission(kind: 'scoop', goal: 1, reward: 2500),
+        Mission(kind: 'hands', goal: 10 + 5 * rng.nextInt(3), reward: 2000),
+        rng.nextBool()
+            ? Mission(kind: 'boards', goal: 4 + rng.nextInt(4), reward: 3000)
+            : Mission(kind: 'pots', goal: 3 + rng.nextInt(3), reward: 3000),
+        rng.nextBool() ? Mission(kind: 'flush', goal: 1, reward: 4000) : Mission(kind: 'scoop', goal: 1, reward: 5000),
       ];
     }
     // Une série cassée repart au jour 1.
@@ -313,17 +489,95 @@ class PlayerProfile extends ChangeNotifier {
     }
   }
 
-  void rename(String value) {
+  // ---------- Compte ----------
+
+  static const nameMin = 3;
+  static const nameMax = 16;
+
+  /// Pourquoi ce pseudo est refusé, ou null s'il convient.
+  static String? validateName(String value) {
     final v = value.trim();
-    if (v.isEmpty) return;
-    name = v.length > 14 ? v.substring(0, 14) : v;
+    if (v.length < nameMin) return 'Au moins $nameMin caractères';
+    if (v.length > nameMax) return 'Au plus $nameMax caractères';
+    if (!RegExp(r"^[\p{L}\p{N} _.'-]+$", unicode: true).hasMatch(v)) return 'Lettres, chiffres, espace, - _ . et \' seulement';
+    return null;
+  }
+
+  static String? validateEmail(String value) {
+    final v = value.trim();
+    if (v.isEmpty) return null;
+    return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v) ? null : 'Adresse e-mail invalide';
+  }
+
+  void updateAccount({
+    String? name,
+    String? bio,
+    String? country,
+    String? city,
+    DateTime? birthDate,
+    bool clearBirthDate = false,
+    String? email,
+  }) {
+    if (name != null && validateName(name) == null) this.name = name.trim();
+    if (bio != null) this.bio = bio.trim().length > 80 ? bio.trim().substring(0, 80) : bio.trim();
+    if (country != null) this.country = country;
+    if (city != null) this.city = city.trim();
+    if (birthDate != null) this.birthDate = birthDate;
+    if (clearBirthDate) this.birthDate = null;
+    if (email != null && validateEmail(email) == null) this.email = email.trim();
+    _save();
+  }
+
+  void setPhoto(Uint8List? bytes) {
+    photo = bytes;
+    _save();
+  }
+
+  void updateSettings({bool? haptics, bool? fastReveal, bool? notifications}) {
+    if (haptics != null) this.haptics = haptics;
+    if (fastReveal != null) this.fastReveal = fastReveal;
+    if (notifications != null) this.notifications = notifications;
+    _save();
+  }
+
+  /// Efface toutes les données du joueur sur l'appareil (exigé par l'App Store).
+  Future<void> deleteAccount() async {
+    final fresh = PlayerProfile._();
+    _fromJson(fresh._toJson());
+    photo = null;
+    birthDate = null;
+    vipUntil = null;
+    lastChestAt = null;
+    lastRescueAt = null;
+    pendingWeeklyReward = null;
+    pendingLevelUps.clear();
+    createdAt = now();
+    weekId = '';
+    missionsDay = '';
+    _refreshPeriods();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_key);
+    } catch (_) {}
     _save();
   }
 
   // ---------- Sauvegarde ----------
 
+  static String? _date(DateTime? d) => d?.toIso8601String();
+  static DateTime? _parse(Object? s) => s is String ? DateTime.tryParse(s) : null;
+
   Map<String, dynamic> _toJson() => {
         'name': name,
+        'avatar': avatarId,
+        'photo': photo == null ? null : base64Encode(photo!),
+        'frame': frame,
+        'bio': bio,
+        'country': country,
+        'city': city,
+        'birth': _date(birthDate),
+        'email': email,
+        'created': _date(createdAt),
         'coins': coins,
         'xp': xp,
         'lp': leaguePoints,
@@ -333,17 +587,38 @@ class PlayerProfile extends ChangeNotifier {
         'streak': streak,
         'mday': missionsDay,
         'missions': [for (final m in missions) m.toJson()],
-        'owned': owned.toList(),
+        'chest': _date(lastChestAt),
+        'rescue': _date(lastRescueAt),
+        'vip': _date(vipUntil),
+        'wreward': pendingWeeklyReward == null
+            ? null
+            : {'rank': pendingWeeklyReward!.rank, 'league': pendingWeeklyReward!.league, 'coins': pendingWeeklyReward!.coins},
+        'owned2': owned.toList(),
         'back': cardBack,
-        'felt': felt,
+        'theme': theme,
         'welcome': welcomeBought,
         'hands': handsPlayed,
         'boards': boardsWon,
+        'pots': potsWon,
+        'scoops': scoops,
         'best': biggestWin,
+        'bestLeague': bestLeagueIndex,
+        'haptics': haptics,
+        'fast': fastReveal,
+        'notif': notifications,
       };
 
   void _fromJson(Map<String, dynamic> j) {
     name = j['name'] ?? name;
+    avatarId = j['avatar'] ?? 'as';
+    photo = j['photo'] is String ? base64Decode(j['photo']) : null;
+    frame = j['frame'] ?? 'aucun';
+    bio = j['bio'] ?? '';
+    country = j['country'] ?? 'FR';
+    city = j['city'] ?? '';
+    birthDate = _parse(j['birth']);
+    email = j['email'] ?? '';
+    createdAt = _parse(j['created']) ?? DateTime.now();
     coins = j['coins'] ?? coins;
     xp = j['xp'] ?? 0;
     leaguePoints = j['lp'] ?? 0;
@@ -353,13 +628,29 @@ class PlayerProfile extends ChangeNotifier {
     streak = j['streak'] ?? 0;
     missionsDay = j['mday'] ?? '';
     missions = [for (final m in (j['missions'] as List? ?? [])) Mission.fromJson(Map<String, dynamic>.from(m))];
-    owned = {...(j['owned'] as List? ?? []).cast<String>(), 'bordeaux', 'vert'};
+    lastChestAt = _parse(j['chest']);
+    lastRescueAt = _parse(j['rescue']);
+    vipUntil = _parse(j['vip']);
+    final w = j['wreward'];
+    pendingWeeklyReward = w is Map ? WeeklyReward(rank: w['rank'], league: w['league'], coins: w['coins']) : null;
+    owned = {...starterItems, ...(j['owned2'] as List? ?? []).cast<String>()};
+    // Sauvegardes d'avant les familles de cosmétiques : les ids seuls désignaient dos et tapis.
+    for (final id in (j['owned'] as List? ?? []).cast<String>()) {
+      if (cardBacks.any((c) => c.id == id)) owned.add('cardBack:$id');
+      if (themes.any((c) => c.id == id)) owned.add('theme:$id');
+    }
     cardBack = j['back'] ?? 'bordeaux';
-    felt = j['felt'] ?? 'vert';
+    theme = j['theme'] ?? j['felt'] ?? 'vert';
     welcomeBought = j['welcome'] ?? false;
     handsPlayed = j['hands'] ?? 0;
     boardsWon = j['boards'] ?? 0;
+    potsWon = j['pots'] ?? 0;
+    scoops = j['scoops'] ?? 0;
     biggestWin = j['best'] ?? 0;
+    bestLeagueIndex = j['bestLeague'] ?? 0;
+    haptics = j['haptics'] ?? true;
+    fastReveal = j['fast'] ?? false;
+    notifications = j['notif'] ?? true;
   }
 
   void _save() {

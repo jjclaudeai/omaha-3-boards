@@ -4,27 +4,117 @@ import '../state/catalog.dart';
 import '../state/profile.dart';
 import '../state/profile_scope.dart';
 import 'card_widget.dart';
+import 'cosmetics.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
 import 'widgets/reward_dialog.dart';
 
-class ShopScreen extends StatelessWidget {
+/// Boutique en 4 rayons : pièces et VIP, thèmes de table, dos de cartes, avatars et cadres.
+class ShopScreen extends StatefulWidget {
   const ShopScreen({super.key});
+
+  @override
+  State<ShopScreen> createState() => _ShopScreenState();
+}
+
+class _ShopScreenState extends State<ShopScreen> {
+  int section = 0;
+
+  static const _sections = [
+    (Icons.monetization_on_rounded, 'Pièces'),
+    (Icons.table_restaurant_rounded, 'Tables'),
+    (Icons.style_rounded, 'Cartes'),
+    (Icons.face_rounded, 'Avatars'),
+  ];
 
   @override
   Widget build(BuildContext context) {
     final p = ProfileScope.of(context);
+    final content = switch (section) {
+      0 => _coins(p),
+      1 => [_CosmeticGrid(items: themes, columns: 2, aspect: 1.05, preview: (c, w) => ThemePreview(theme: c, width: w))],
+      2 => [
+          _CosmeticGrid(
+            items: cardBacks,
+            columns: 3,
+            aspect: 0.62,
+            preview: (c, w) => PlayingCard(width: w * 0.5, faceUp: false, back: c),
+          ),
+        ],
+      _ => [
+          Text('Avatars', style: display(21)),
+          Text('Ou mets ta propre photo depuis Mon compte.', style: body(13, color: Palette.textLo, weight: FontWeight.w500)),
+          const SizedBox(height: 10),
+          _CosmeticGrid(
+            items: avatars,
+            columns: 3,
+            aspect: 0.78,
+            preview: (c, w) => Avatar(name: c.name, size: w * 0.55, avatarId: c.id),
+          ),
+          const SizedBox(height: 20),
+          Text('Cadres', style: display(21)),
+          Text('Visibles à la table et au classement.', style: body(13, color: Palette.textLo, weight: FontWeight.w500)),
+          const SizedBox(height: 10),
+          _CosmeticGrid(
+            items: frames,
+            columns: 3,
+            aspect: 0.78,
+            preview: (c, w) => Avatar(name: p.name, size: w * 0.5, avatarId: p.avatarId, photo: p.photo, frame: c.id),
+          ),
+        ],
+    };
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         Text('Boutique', style: display(30)),
-        Text('Les pièces servent à payer la cave des tables. Elles ne s\'échangent jamais contre de l\'argent.',
-            style: body(13.5, color: Palette.textLo, weight: FontWeight.w500)),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            for (var i = 0; i < _sections.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(
+                child: Pressable(
+                  onTap: () => setState(() => section = i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    height: 58,
+                    decoration: BoxDecoration(
+                      color: section == i ? Palette.gold : Palette.panel,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: section == i ? Palette.gold : Palette.panelLine),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(_sections[i].$1, size: 22, color: section == i ? Palette.night : Palette.textLo),
+                        Text(_sections[i].$2, style: body(12, color: section == i ? Palette.night : Palette.textHi, weight: FontWeight.w800)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 16),
+        ...content,
+        const SizedBox(height: 18),
+        Text(
+          'Les pièces n\'ont aucune valeur en dehors du jeu : elles ne s\'échangent ni contre de l\'argent ni contre des lots. '
+          'Prototype : les achats sont simulés, rien n\'est débité. Dans l\'application publiée, le paiement passera par l\'App Store ou Google Play.',
+          style: body(11.5, color: Palette.textLo, weight: FontWeight.w500),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _coins(PlayerProfile p) => [
         if (!p.welcomeBought) ...[
-          _PackTile(pack: welcomeOffer, highlight: true, subtitle: '+ dos de cartes Or royal'),
+          _PackTile(pack: welcomeOffer, highlight: true, subtitle: '+ dos Or royal et cadre Or'),
           const SizedBox(height: 12),
         ],
+        const _VipCard(),
+        const SizedBox(height: 12),
         GridView.count(
           crossAxisCount: 2,
           shrinkWrap: true,
@@ -34,33 +124,100 @@ class ShopScreen extends StatelessWidget {
           childAspectRatio: 0.82,
           children: [for (final pack in coinPacks) _PackTile(pack: pack)],
         ),
-        const SizedBox(height: 22),
-        Text('Dos de cartes', style: display(21)),
-        const SizedBox(height: 10),
-        _CosmeticRow(items: cardBacks, selected: p.cardBack, preview: (c) => PlayingCard(width: 48, faceUp: false, back: c.colors)),
-        const SizedBox(height: 22),
-        Text('Tapis', style: display(21)),
-        const SizedBox(height: 10),
-        _CosmeticRow(
-          items: felts,
-          selected: p.felt,
-          preview: (c) => Container(
-            width: 64,
-            height: 44,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
-              gradient: RadialGradient(colors: c.colors),
-              border: Border.all(color: const Color(0xFF4E342E), width: 4),
-            ),
+      ];
+}
+
+Future<bool> _confirmPurchase(BuildContext context, {required String title, required String price, String? detail}) async {
+  final ok = await showModalBottomSheet<bool>(
+    context: context,
+    backgroundColor: Palette.nightRaised,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    builder: (context) => Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(title, style: display(26), textAlign: TextAlign.center),
+          const SizedBox(height: 4),
+          Text('Prix : $price', style: body(16, color: Palette.textLo)),
+          if (detail != null) ...[
+            const SizedBox(height: 6),
+            Text(detail, style: body(13.5, weight: FontWeight.w500), textAlign: TextAlign.center),
+          ],
+          const SizedBox(height: 10),
+          Text(
+            'Achat simulé pour le prototype : rien n\'est débité.',
+            style: body(13.5, color: Palette.textLo, weight: FontWeight.w500),
+            textAlign: TextAlign.center,
           ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Prototype : les achats sont simulés et aucun paiement n\'est demandé. '
-          'Dans l\'application publiée, le paiement passera par l\'App Store ou Google Play.',
-          style: body(12, color: Palette.textLo, weight: FontWeight.w500),
-        ),
-      ],
+          const SizedBox(height: 18),
+          ChunkyButton(label: 'Confirmer l\'achat', onTap: () => Navigator.pop(context, true)),
+        ],
+      ),
+    ),
+  );
+  return ok == true;
+}
+
+class _VipCard extends StatelessWidget {
+  const _VipCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = ProfileScope.of(context);
+    const perks = ['Bonus quotidien doublé', 'Coffre gratuit toutes les 2 h', '+25 % d\'expérience', 'Table, cartes et cadre VIP'];
+    return Panel(
+      padding: const EdgeInsets.all(16),
+      gradient: const LinearGradient(colors: [Color(0xFF3A2A63), Color(0xFF15102A)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      borderColor: const Color(0xFFB98CFF),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.workspace_premium_rounded, color: Color(0xFFE2D4FF), size: 30),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Pass VIP', style: display(23))),
+              if (p.isVip)
+                Text('Encore ${p.vipDaysLeft} j', style: body(13, color: const Color(0xFFE2D4FF), weight: FontWeight.w800)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final perk in perks)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 3),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Palette.mint, size: 17),
+                  const SizedBox(width: 6),
+                  Text(perk, style: body(13.5, weight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          Row(
+            children: [
+              const CoinIcon(size: 16),
+              const SizedBox(width: 5),
+              Text('+ ${formatCoins(vipPass.coins)} pièces tout de suite', style: body(13.5, color: Palette.gold)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ChunkyButton(
+            label: p.isVip ? 'Prolonger 30 jours · ${vipPass.price}' : '30 jours · ${vipPass.price}',
+            height: 48,
+            fontSize: 18,
+            color: const Color(0xFFB98CFF),
+            shade: const Color(0xFF6B3FA0),
+            textColor: const Color(0xFF1A0B3B),
+            onTap: () async {
+              if (await _confirmPurchase(context, title: 'Pass VIP 30 jours', price: vipPass.price) && context.mounted) {
+                ProfileScope.read(context).purchaseVip();
+                showReward(context, title: 'Bienvenue au club VIP', subtitle: '30 jours d\'avantages', coins: vipPass.coins);
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 }
@@ -71,34 +228,11 @@ class _PackTile extends StatelessWidget {
   final bool highlight;
   final String? subtitle;
 
-  int get _stackSize => switch (pack.coins) { < 20000 => 1, < 60000 => 2, < 150000 => 3, < 500000 => 4, _ => 5 };
+  int get _stackSize => switch (pack.coins) { < 50000 => 1, < 100000 => 2, < 300000 => 3, < 1000000 => 4, _ => 5 };
 
   Future<void> _buy(BuildContext context) async {
-    final ok = await showModalBottomSheet<bool>(
-      context: context,
-      backgroundColor: Palette.nightRaised,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('${formatCoins(pack.coins)} pièces', style: display(26)),
-            const SizedBox(height: 4),
-            Text('Prix : ${pack.price}', style: body(16, color: Palette.textLo)),
-            const SizedBox(height: 10),
-            Text(
-              'Achat simulé pour le prototype : rien n\'est débité.',
-              style: body(13.5, color: Palette.textLo, weight: FontWeight.w500),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 18),
-            ChunkyButton(label: 'Confirmer l\'achat', onTap: () => Navigator.pop(context, true)),
-          ],
-        ),
-      ),
-    );
-    if (ok == true && context.mounted) {
+    if (await _confirmPurchase(context, title: '${formatCoins(pack.coins)} pièces', price: pack.price, detail: subtitle) &&
+        context.mounted) {
       ProfileScope.read(context).purchasePack(pack);
       showReward(context, title: 'Merci !', subtitle: pack.price, coins: pack.coins);
     }
@@ -169,58 +303,67 @@ class _PackTile extends StatelessWidget {
   }
 }
 
-class _CosmeticRow extends StatelessWidget {
-  const _CosmeticRow({required this.items, required this.selected, required this.preview});
+/// Grille d'objets cosmétiques avec aperçu, prix, verrou de niveau ou bouton Équiper.
+class _CosmeticGrid extends StatelessWidget {
+  const _CosmeticGrid({required this.items, required this.columns, required this.aspect, required this.preview});
   final List<Cosmetic> items;
-  final String selected;
-  final Widget Function(Cosmetic) preview;
+  final int columns;
+  final double aspect;
+  final Widget Function(Cosmetic c, double width) preview;
 
   @override
   Widget build(BuildContext context) {
     final p = ProfileScope.of(context);
-    return SizedBox(
-      height: 150,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: items.length,
-        separatorBuilder: (context, i) => const SizedBox(width: 10),
-        itemBuilder: (context, i) {
-          final c = items[i];
-          final own = p.owned.contains(c.id);
-          final on = selected == c.id;
-          return SizedBox(
-            width: 112,
-            child: Panel(
-              padding: const EdgeInsets.all(10),
-              borderColor: on ? Palette.gold : null,
-              child: Column(
-                children: [
-                  SizedBox(height: 70, child: Center(child: preview(c))),
-                  const SizedBox(height: 4),
-                  Text(c.name, style: body(12.5), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  const Spacer(),
-                  SizedBox(
-                    height: 30,
-                    child: on
-                        ? Center(child: Text('Équipé', style: body(12.5, color: Palette.gold)))
-                        : own
-                            ? _SmallButton(label: 'Équiper', onTap: () => p.equip(c))
-                            : _SmallButton(
-                                label: formatCoins(c.price),
-                                coin: true,
-                                onTap: () => _buyCosmetic(context, p, c),
-                              ),
-                  ),
-                ],
-              ),
+    return LayoutBuilder(builder: (context, box) {
+      final tileW = (box.maxWidth - 10 * (columns - 1)) / columns;
+      return GridView.count(
+        crossAxisCount: columns,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: aspect,
+        children: [
+          for (final c in items)
+            if (!c.vipOnly || p.owns(c)) _tile(context, p, c, tileW),
+        ],
+      );
+    });
+  }
+
+  Widget _tile(BuildContext context, PlayerProfile p, Cosmetic c, double w) {
+    final own = p.owns(c);
+    final on = p.isEquipped(c);
+    final lock = p.lockReason(c);
+    return Panel(
+      padding: const EdgeInsets.all(8),
+      borderColor: on ? Palette.gold : null,
+      child: Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: Opacity(opacity: lock != null ? 0.55 : 1, child: preview(c, w - 16)),
             ),
-          );
-        },
+          ),
+          const SizedBox(height: 4),
+          Text(c.name, style: body(12.5), maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 4),
+          SizedBox(
+            height: 30,
+            child: on
+                ? Center(child: Text('Équipé', style: body(12.5, color: Palette.gold)))
+                : own
+                    ? _SmallButton(label: 'Équiper', onTap: () => p.equip(c))
+                    : lock != null
+                        ? _SmallButton(label: lock, icon: Icons.lock_rounded, onTap: () => toast(context, '${c.name} : $lock requis'))
+                        : _SmallButton(label: formatCoins(c.price), coin: true, onTap: () => _buy(context, p, c)),
+          ),
+        ],
       ),
     );
   }
 
-  void _buyCosmetic(BuildContext context, PlayerProfile p, Cosmetic c) {
+  void _buy(BuildContext context, PlayerProfile p, Cosmetic c) {
     if (p.buyCosmetic(c)) {
       p.equip(c);
       toast(context, '${c.name} débloqué et équipé');
@@ -231,10 +374,11 @@ class _CosmeticRow extends StatelessWidget {
 }
 
 class _SmallButton extends StatelessWidget {
-  const _SmallButton({required this.label, required this.onTap, this.coin = false});
+  const _SmallButton({required this.label, required this.onTap, this.coin = false, this.icon});
   final String label;
   final VoidCallback onTap;
   final bool coin;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -247,7 +391,8 @@ class _SmallButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (coin) ...[const CoinIcon(size: 14), const SizedBox(width: 4)],
-            Text(label, style: body(12.5, weight: FontWeight.w800)),
+            if (icon != null) ...[Icon(icon, size: 13, color: Palette.textLo), const SizedBox(width: 3)],
+            Text(label, style: body(12, weight: FontWeight.w800, color: icon != null ? Palette.textLo : Palette.textHi)),
           ],
         ),
       ),

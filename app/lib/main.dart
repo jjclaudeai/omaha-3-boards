@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'state/profile.dart';
 import 'state/profile_scope.dart';
 import 'ui/app_shell.dart';
 import 'ui/theme.dart';
+import 'ui/widgets/common.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   final profile = await PlayerProfile.load();
+  hapticsEnabled = profile.haptics;
+  profile.addListener(() => hapticsEnabled = profile.haptics);
   runApp(OmahaApp(profile: profile));
 }
 
@@ -25,6 +29,9 @@ class OmahaApp extends StatelessWidget {
         title: 'Omaha 3 boards',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(),
+        locale: const Locale('fr', 'FR'),
+        supportedLocales: const [Locale('fr', 'FR')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
         home: const AppShell(),
       ),
     );
