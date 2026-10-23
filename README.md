@@ -10,6 +10,8 @@ Application mobile (iOS et Android) de poker Omaha 6 cartes Pot-Limit joué sur 
   - `lib/game_controller.dart` : enchaîne les mains, fait jouer les bots, remplace un bot ruiné.
   - `lib/ui/` : table (6 sièges, 3 boards, cartes 4 couleurs, animations de distribution, résultats par board).
 
+- `admin/` : back-office web du propriétaire (joueurs, économie, ligues, salles, boutique, config distante). Voir `admin/README.md`.
+
 - `engine/` : moteur de règles en TypeScript, sans dépendance. Il tournera sur le serveur de jeu, qui fait autorité.
   - `src/cards.ts` : cartes, paquet, mélange.
   - `src/evaluator.ts` : valeur d'une main de 5 cartes.
