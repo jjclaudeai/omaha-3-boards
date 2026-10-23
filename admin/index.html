@@ -192,7 +192,8 @@ const DEFAULT_CONFIG = {
   startingCoins: 10000,
   dailyRewards: [1000, 1500, 2000, 3000, 4000, 6000, 10000],
   freeGains: { chestEveryHours: 4, chestEveryHoursVip: 2, chestMin: 500, chestMax: 2000, levelUpPerLevel: 500, rescueCoins: 2000, rescueEveryHours: 6 },
-  missionRewards: { hands: 1000, boards: 1500, flush: 2000, scoop: 2500 },
+  missionRewards: { hands: 2000, boards: 3000, pots: 3000, flush: 4000, scoop: 5000 },
+  starterItems: ['theme:vert', 'cardBack:bordeaux', 'avatar:as', 'avatar:chat', 'avatar:eclair', 'avatar:fusee', 'frame:aucun'],
   rake: { percent: 5, capBigBlinds: 2 },
   buyInBigBlinds: 50,
   rooms: [
@@ -201,7 +202,7 @@ const DEFAULT_CONFIG = {
     { id: 'club', name: 'Club privé', smallBlind: 200, bigBlind: 400, minLevel: 6, leagueMultiplier: 3, color: '#B57CFF', active: true },
     { id: 'prestige', name: 'Prestige', smallBlind: 1000, bigBlind: 2000, minLevel: 10, leagueMultiplier: 5, color: '#F6C453', active: true },
     { id: 'elite', name: 'Élite', smallBlind: 5000, bigBlind: 10000, minLevel: 15, leagueMultiplier: 8, color: '#FF7A6B', active: true },
-    { id: 'legende', name: 'Légende', smallBlind: 25000, bigBlind: 50000, minLevel: 20, leagueMultiplier: 12, color: '#E35DD2', active: true },
+    { id: 'legende', name: 'Légende', smallBlind: 25000, bigBlind: 50000, minLevel: 20, leagueMultiplier: 12, color: '#FF4FD8', active: true },
   ],
   coinPacks: [
     { id: 'poignee', coins: 25000, priceCents: 199, bonusPercent: 0, tag: '', active: true },
@@ -209,37 +210,57 @@ const DEFAULT_CONFIG = {
     { id: 'coffret', coins: 160000, priceCents: 999, bonusPercent: 28, tag: 'Populaire', active: true },
     { id: 'malle', coins: 360000, priceCents: 1999, bonusPercent: 44, tag: '', active: true },
     { id: 'tresor', coins: 1000000, priceCents: 4999, bonusPercent: 60, tag: 'Meilleure valeur', active: true },
-    { id: 'empire', coins: 2200000, priceCents: 9999, bonusPercent: 76, tag: '', active: true },
+    { id: 'fortune', coins: 2200000, priceCents: 9999, bonusPercent: 76, tag: '', active: true },
   ],
   welcomeOffer: { id: 'bienvenue', coins: 60000, priceCents: 99, bonusPercent: 0, tag: 'Une seule fois', active: true },
-  vipPass: { id: 'vip', coins: 50000, priceCents: 499, days: 30, active: true },
+  vipPass: { id: 'vip30', coins: 50000, priceCents: 499, tag: '30 jours', days: 30, active: true },
   // Cosmétiques : kind = theme | cardBack | avatar | frame ; owned côté joueur = "kind:id".
   cosmetics: {
     themes: [
-      { id: 'vert', kind: 'theme', name: 'Vert classique', price: 0, colors: ['#2E8B57', '#1B5E3A'], pattern: 'none', minLevel: 1, vipOnly: false, active: true },
-      { id: 'minuit', kind: 'theme', name: 'Bleu minuit', price: 60000, colors: ['#2F5E9E', '#173561'], pattern: 'waves', minLevel: 3, vipOnly: false, active: true },
-      { id: 'grenat', kind: 'theme', name: 'Grenat', price: 60000, colors: ['#9E2F3E', '#5E1621'], pattern: 'diamonds', minLevel: 3, vipOnly: false, active: true },
-      { id: 'artdeco', kind: 'theme', name: 'Art déco', price: 250000, colors: ['#1E2A2A', '#0B1212'], pattern: 'artDeco', minLevel: 8, vipOnly: false, active: true },
-      { id: 'galaxie', kind: 'theme', name: 'Galaxie', price: 400000, colors: ['#3A2370', '#120A2B'], pattern: 'stars', minLevel: 12, vipOnly: true, active: true },
+      {id: 'vert', kind: 'theme', name: 'Vert classique', price: 0, colors: ['#2E9A63', '#175236'], pattern: 'none', rail: ['#7B5236', '#3B2416'], accent: '#E9D9A6', minLevel: 1, vipOnly: false, active: true},
+      {id: 'bleu', kind: 'theme', name: 'Bleu minuit', price: 25000, colors: ['#3567B0', '#142B57'], pattern: 'stars', rail: ['#26324A', '#0C121E'], accent: '#9CC3FF', minLevel: 1, vipOnly: false, active: true},
+      {id: 'grenat', kind: 'theme', name: 'Grenat', price: 25000, colors: ['#AA3446', '#55121F'], pattern: 'diamonds', rail: ['#2B2B2B', '#0E0E0E'], accent: '#FFC2B0', minLevel: 1, vipOnly: false, active: true},
+      {id: 'riviera', kind: 'theme', name: 'Riviera', price: 40000, colors: ['#1FB5B0', '#0B5D69'], pattern: 'waves', rail: ['#F3E7D3', '#B9A586'], accent: '#FFFFFF', minLevel: 2, vipOnly: false, active: true},
+      {id: 'jungle', kind: 'theme', name: 'Jungle émeraude', price: 60000, colors: ['#1E8C4E', '#0A3B22'], pattern: 'scales', rail: ['#8A6B2F', '#3F2C0D'], accent: '#B8F27C', minLevel: 4, vipOnly: false, active: true},
+      {id: 'glacier', kind: 'theme', name: 'Glacier', price: 60000, colors: ['#8FD3F4', '#2D6E9E'], pattern: 'hexagons', rail: ['#E6EEF5', '#8A9BAD'], accent: '#FFFFFF', minLevel: 4, vipOnly: false, active: true},
+      {id: 'onyx', kind: 'theme', name: 'Onyx et or', price: 90000, colors: ['#3C3C46', '#111116'], pattern: 'artDeco', rail: ['#F2CF6B', '#8C6416'], accent: '#F6C453', minLevel: 6, vipOnly: false, active: true},
+      {id: 'neon', kind: 'theme', name: 'Néon Vegas', price: 150000, colors: ['#5B2C9E', '#1A0B3B'], pattern: 'hexagons', rail: ['#FF4FD8', '#7A1F8C'], accent: '#4FF3FF', minLevel: 8, vipOnly: false, active: true},
+      {id: 'sakura', kind: 'theme', name: 'Sakura', price: 150000, colors: ['#D9779B', '#6A2447'], pattern: 'stars', rail: ['#2E1A24', '#120A0F'], accent: '#FFE1EC', minLevel: 8, vipOnly: false, active: true},
+      {id: 'monaco', kind: 'theme', name: 'Monaco royal', price: 400000, colors: ['#B0202E', '#4A0710'], pattern: 'artDeco', rail: ['#FFE08A', '#A0711B'], accent: '#FFE08A', minLevel: 12, vipOnly: false, active: true},
+      {id: 'vip', kind: 'theme', name: 'Salon VIP', price: 0, colors: ['#26262E', '#07070A'], pattern: 'diamonds', rail: ['#B98CFF', '#4B2A85'], accent: '#E2D4FF', minLevel: 1, vipOnly: true, active: true},
     ],
     cardBacks: [
-      { id: 'bordeaux', kind: 'cardBack', name: 'Bordeaux', price: 0, colors: ['#8E1B2C', '#5C0F1C'], pattern: 'none', minLevel: 1, vipOnly: false, active: true },
-      { id: 'nuit', kind: 'cardBack', name: 'Nuit étoilée', price: 40000, colors: ['#243B6B', '#0D1730'], pattern: 'stars', minLevel: 2, vipOnly: false, active: true },
-      { id: 'emeraude', kind: 'cardBack', name: 'Émeraude', price: 40000, colors: ['#15805A', '#07402B'], pattern: 'hexagons', minLevel: 2, vipOnly: false, active: true },
-      { id: 'royal', kind: 'cardBack', name: 'Or royal', price: 150000, colors: ['#E2B54A', '#8C5E12'], pattern: 'artDeco', minLevel: 6, vipOnly: false, active: true },
-      { id: 'dragon', kind: 'cardBack', name: 'Écailles de dragon', price: 300000, colors: ['#1F6E5C', '#0A2B24'], pattern: 'scales', minLevel: 10, vipOnly: true, active: true },
+      {id: 'bordeaux', kind: 'cardBack', name: 'Bordeaux', price: 0, colors: ['#9E2236', '#5C0F1C'], pattern: 'diamonds', icon: 'diamond_outlined', minLevel: 1, vipOnly: false, active: true},
+      {id: 'nuit', kind: 'cardBack', name: 'Nuit étoilée', price: 15000, colors: ['#2B4782', '#0D1730'], pattern: 'stars', icon: 'nightlight_round', minLevel: 1, vipOnly: false, active: true},
+      {id: 'emeraude', kind: 'cardBack', name: 'Émeraude', price: 15000, colors: ['#18915F', '#07402B'], pattern: 'scales', icon: 'eco_rounded', minLevel: 1, vipOnly: false, active: true},
+      {id: 'ocean', kind: 'cardBack', name: 'Océan', price: 25000, colors: ['#1AA6C9', '#0B4566'], pattern: 'waves', icon: 'sailing_rounded', minLevel: 2, vipOnly: false, active: true},
+      {id: 'rayures', kind: 'cardBack', name: 'Rayures rétro', price: 25000, colors: ['#F08A3C', '#9E3A12'], pattern: 'stripes', icon: 'local_fire_department_rounded', minLevel: 3, vipOnly: false, active: true},
+      {id: 'givre', kind: 'cardBack', name: 'Givre', price: 40000, colors: ['#B5E3F8', '#4B86B4'], pattern: 'hexagons', icon: 'ac_unit_rounded', minLevel: 4, vipOnly: false, active: true},
+      {id: 'royal', kind: 'cardBack', name: 'Or royal', price: 60000, colors: ['#E8BE55', '#8C5E12'], pattern: 'artDeco', icon: 'workspace_premium_rounded', minLevel: 5, vipOnly: false, active: true},
+      {id: 'neon', kind: 'cardBack', name: 'Néon', price: 90000, colors: ['#6A2FC2', '#1A0B3B'], pattern: 'hexagons', accent: '#4FF3FF', icon: 'bolt_rounded', minLevel: 8, vipOnly: false, active: true},
+      {id: 'dragon', kind: 'cardBack', name: 'Dragon', price: 200000, colors: ['#C0392B', '#3B0A06'], pattern: 'scales', accent: '#FFD27A', icon: 'whatshot_rounded', minLevel: 10, vipOnly: false, active: true},
+      {id: 'vip', kind: 'cardBack', name: 'VIP', price: 0, colors: ['#2A2340', '#0B0814'], pattern: 'artDeco', accent: '#B98CFF', icon: 'star_rounded', minLevel: 1, vipOnly: true, active: true},
     ],
     avatars: [
-      { id: 'as', kind: 'avatar', name: 'As de pique', price: 0, colors: ['#55A8FF', '#1F4E8C'], pattern: 'none', minLevel: 1, vipOnly: false, active: true },
-      { id: 'renard', kind: 'avatar', name: 'Renard', price: 20000, colors: ['#E8823A', '#8C3F12'], pattern: 'none', minLevel: 1, vipOnly: false, active: true },
-      { id: 'hibou', kind: 'avatar', name: 'Hibou', price: 20000, colors: ['#8A6FD1', '#3D2A7A'], pattern: 'none', minLevel: 4, vipOnly: false, active: true },
-      { id: 'lion', kind: 'avatar', name: 'Lion', price: 120000, colors: ['#F6C453', '#A8701A'], pattern: 'none', minLevel: 10, vipOnly: false, active: true },
+      {id: 'as', kind: 'avatar', name: 'As', price: 0, colors: ['#E76F51', '#B0412A'], pattern: 'none', icon: 'style_rounded', minLevel: 1, vipOnly: false, active: true},
+      {id: 'chat', kind: 'avatar', name: 'Chat', price: 0, colors: ['#2A9D8F', '#16655C'], pattern: 'none', icon: 'pets_rounded', minLevel: 1, vipOnly: false, active: true},
+      {id: 'eclair', kind: 'avatar', name: 'Éclair', price: 0, colors: ['#8E7DFF', '#5440C9'], pattern: 'none', icon: 'bolt_rounded', minLevel: 1, vipOnly: false, active: true},
+      {id: 'fusee', kind: 'avatar', name: 'Fusée', price: 0, colors: ['#4CC9F0', '#1C7FA3'], pattern: 'none', icon: 'rocket_launch_rounded', minLevel: 1, vipOnly: false, active: true},
+      {id: 'ancre', kind: 'avatar', name: 'Ancre', price: 8000, colors: ['#3D5A80', '#1B2D47'], pattern: 'none', icon: 'anchor_rounded', minLevel: 1, vipOnly: false, active: true},
+      {id: 'feu', kind: 'avatar', name: 'Flamme', price: 8000, colors: ['#F77F00', '#B23A00'], pattern: 'none', icon: 'local_fire_department_rounded', minLevel: 1, vipOnly: false, active: true},
+      {id: 'trefle', kind: 'avatar', name: 'Trèfle', price: 12000, colors: ['#52B788', '#1B4332'], pattern: 'none', icon: 'spa_rounded', minLevel: 1, vipOnly: false, active: true},
+      {id: 'masque', kind: 'avatar', name: 'Masque', price: 20000, colors: ['#EF476F', '#8C1D3A'], pattern: 'none', icon: 'theater_comedy_rounded', minLevel: 3, vipOnly: false, active: true},
+      {id: 'diamant', kind: 'avatar', name: 'Diamant', price: 50000, colors: ['#8FB8FF', '#3B5BA8'], pattern: 'none', icon: 'diamond_rounded', minLevel: 6, vipOnly: false, active: true},
+      {id: 'couronne', kind: 'avatar', name: 'Couronne', price: 120000, colors: ['#F6C453', '#9C6B10'], pattern: 'none', icon: 'emoji_events_rounded', minLevel: 10, vipOnly: false, active: true},
     ],
     frames: [
-      { id: 'simple', kind: 'frame', name: 'Simple', price: 0, colors: ['#93A5BF', '#5A6B84'], pattern: 'none', minLevel: 1, vipOnly: false, active: true },
-      { id: 'argent', kind: 'frame', name: 'Argent', price: 50000, colors: ['#E3E8F0', '#8C97A8'], pattern: 'stripes', minLevel: 5, vipOnly: false, active: true },
-      { id: 'or', kind: 'frame', name: 'Or', price: 200000, colors: ['#F6C453', '#A8701A'], pattern: 'stripes', minLevel: 10, vipOnly: false, active: true },
-      { id: 'vip', kind: 'frame', name: 'Couronne VIP', price: 0, colors: ['#E35DD2', '#6B1F63'], pattern: 'diamonds', minLevel: 1, vipOnly: true, active: true },
+      {id: 'aucun', kind: 'frame', name: 'Sans cadre', price: 0, colors: ['#00000000', '#00000000'], pattern: 'none', minLevel: 1, vipOnly: false, active: true},
+      {id: 'argent', kind: 'frame', name: 'Argent', price: 20000, colors: ['#F2F5FA', '#8A9BAD'], pattern: 'none', minLevel: 2, vipOnly: false, active: true},
+      {id: 'or', kind: 'frame', name: 'Or', price: 60000, colors: ['#FFE08A', '#C98D23'], pattern: 'none', minLevel: 5, vipOnly: false, active: true},
+      {id: 'emeraude', kind: 'frame', name: 'Émeraude', price: 60000, colors: ['#7CF2B0', '#15805A'], pattern: 'none', minLevel: 5, vipOnly: false, active: true},
+      {id: 'neon', kind: 'frame', name: 'Néon', price: 120000, colors: ['#FF4FD8', '#4FF3FF'], pattern: 'none', minLevel: 8, vipOnly: false, active: true},
+      {id: 'diamant', kind: 'frame', name: 'Diamant', price: 300000, colors: ['#E0F0FF', '#8FB8FF'], pattern: 'none', minLevel: 12, vipOnly: false, active: true},
+      {id: 'vip', kind: 'frame', name: 'VIP', price: 0, colors: ['#E2D4FF', '#7B4FD6'], pattern: 'none', minLevel: 1, vipOnly: true, active: true},
     ],
   },
   // Points de ligue cumulés pour entrer ; prime hebdo = barème par rang × rewardScale de la ligue.
@@ -317,7 +338,7 @@ function generateDemo() {
     const lp = Math.floor(hands * (1 + r() * 5));
     const boardsWon = Math.floor(hands * (0.28 + r() * 0.2));
     const p = {
-      id: 'J' + String(10001 + i), name, avatarId: 'as', avatarUrl: null, frame: 'simple', theme: 'vert', cardBack: 'bordeaux',
+      id: 'J' + String(10001 + i), name, avatarId: 'as', avatarUrl: null, frame: 'aucun', theme: 'vert', cardBack: 'bordeaux',
       bio: r() < 0.3 ? pick(['Fan d’Omaha depuis 2019', 'Je rafle les 3 boards', 'Joueur du dimanche', 'Toujours partant pour une partie', 'Objectif : ligue Champion']) : '',
       country, city: pick(CITIES[country]), birthDate: `${1965 + Math.floor(r() * 40)}-0${1 + Math.floor(r() * 9)}-1${Math.floor(r() * 9)}`,
       email: r() < 0.7 ? `${name.toLowerCase().replace(/[^a-z0-9]/g, '')}${Math.floor(r() * 99)}@exemple.fr` : '',
@@ -326,7 +347,7 @@ function generateDemo() {
       leaguePoints: lp, weeklyPoints: now - lastSeenAt < 7 * DAY ? Math.floor(r() * (60 + lp / 18)) : 0,
       handsPlayed: hands, boardsWon, potsWon: Math.floor(boardsWon * 0.45), scoops: Math.floor(boardsWon * (0.04 + r() * 0.04)),
       biggestWin: Math.floor(r() * a * 120000),
-      owned: cos.filter(c => !c.price && !c.vipOnly).map(cosKey), welcomeBought: false,
+      owned: [...cfg.starterItems], welcomeBought: false,
       banned: false, banReason: '', avColor: pick(AV_COLORS),
     };
     const lvl = levelOf(p.xp);
@@ -373,7 +394,7 @@ function generateDemo() {
 }
 
 // ---------- Stockage local (démo) ----------
-const KEY = 'omaha-admin-demo-v2';
+const KEY = 'omaha-admin-demo-v3';
 let S;
 function load() {
   try { const raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); return; } } catch (_) {}
@@ -661,7 +682,7 @@ VIEWS.salles = () => {
 // Boutique
 function preview(c) {
   const g = `linear-gradient(135deg, ${c.colors[0]}, ${c.colors[1]})`;
-  if (c.kind === 'theme') return `<span class="feltchip" style="display:inline-block;background:radial-gradient(circle at 50% 40%, ${c.colors[0]}, ${c.colors[1]})"></span>`;
+  if (c.kind === 'theme') return `<span class="feltchip" style="display:inline-block;background:radial-gradient(circle at 50% 40%, ${c.colors[0]}, ${c.colors[1]});border:4px solid ${c.rail?.[0] ?? '#6D4C41'}"></span>`;
   if (c.kind === 'cardBack') return `<span class="back" style="display:inline-block;background:${g}"></span>`;
   if (c.kind === 'avatar') return `<span class="av" style="background:${g};width:36px;height:36px">${esc(c.name[0])}</span>`;
   return `<span style="display:inline-block;width:36px;height:36px;border-radius:50%;border:4px solid ${c.colors[0]};box-shadow:0 0 0 2px ${c.colors[1]}"></span>`;
@@ -684,12 +705,12 @@ VIEWS.boutique = () => {
   const cosTable = key => `<div class="scroll"><table><thead><tr><th>Aperçu</th><th>Nom</th><th>Identifiant</th><th>Couleurs</th><th>Motif</th><th class="n">Prix (pièces)</th><th class="n">Niveau min.</th><th>VIP</th><th class="n">Possédé par</th><th>En vente</th></tr></thead><tbody>
     ${d.cosmetics[key].map((c, i) => { const p = `cosmetics.${key}.${i}`; return `<tr><td>${preview(c)}</td><td>${field(p + '.name', 'text', 'w-m')}</td><td class="muted small">${esc(cosKey(c))}</td><td>${field(p + '.colors.0', 'color')} ${field(p + '.colors.1', 'color')}</td><td>${field(p + '.pattern', PATTERNS)}</td><td class="n">${field(p + '.price')}</td><td class="n">${field(p + '.minLevel', 'number', 'w-s')}</td><td>${field(p + '.vipOnly', 'checkbox')}</td><td class="n">${fmt(owners(c))}</td><td>${field(p + '.active', 'checkbox')}</td></tr>`; }).join('')}
     </tbody></table></div><div class="formrow"><button class="btn" data-action="add-cos" data-key="${key}">Ajouter</button><span class="muted small">Prix 0 = offert à tous (ou à tous les VIP si la case VIP est cochée).</span></div>`;
-  const packRow = (path, pk, note) => { const s = sales(pk.id); return `<tr><td><b>${esc(pk.id)}</b>${note ? `<br><span class="muted small">${note}</span>` : ''}</td><td class="n">${field(path + '.coins')}</td><td class="n">${field(path + '.priceCents', 'number', 'w-s')}</td><td class="n">${eur(pk.priceCents)}</td><td class="n">${fmt(pk.coins / (pk.priceCents / 100))}</td><td class="n">${'bonusPercent' in pk ? field(path + '.bonusPercent', 'number', 'w-s') : ''}</td><td>${'tag' in pk ? field(path + '.tag', 'text', 'w-m') : field(path + '.days', 'number', 'w-s') + ' j'}</td><td class="n">${fmt(s.length)}</td><td class="n">${eur(s.reduce((a, t) => a + t.c, 0))}</td><td>${field(path + '.active', 'checkbox')}</td></tr>`; };
+  const packRow = (path, pk, note) => { const s = sales(pk.id); return `<tr><td><b>${esc(pk.id)}</b>${note ? `<br><span class="muted small">${note}</span>` : ''}</td><td class="n">${field(path + '.coins')}</td><td class="n">${field(path + '.priceCents', 'number', 'w-s')}</td><td class="n">${eur(pk.priceCents)}</td><td class="n">${fmt(pk.coins / (pk.priceCents / 100))}</td><td class="n">${'bonusPercent' in pk ? field(path + '.bonusPercent', 'number', 'w-s') : ''}</td><td>${'days' in pk ? field(path + '.days', 'number', 'w-s') + ' jours' : field(path + '.tag', 'text', 'w-m')}</td><td class="n">${fmt(s.length)}</td><td class="n">${eur(s.reduce((a, t) => a + t.c, 0))}</td><td>${field(path + '.active', 'checkbox')}</td></tr>`; };
   return head('Boutique', 'Packs de pièces, offres spéciales et cosmétiques') +
     `<div class="seg" role="group" aria-label="Rayon">${[['packs', 'Pièces et offres'], ...KINDS].map(([k, l]) => `<button data-action="shoptab" data-k="${k}" aria-pressed="${UI.shopTab === k}">${l}</button>`).join('')}</div>
     ${UI.shopTab === 'packs' ? `<section class="box"><header><h2>Packs de pièces</h2><p>prix en centimes, encaissés par l’App Store ou Google Play</p></header>
       <div class="scroll"><table><thead><tr><th>Pack</th><th class="n">Pièces</th><th class="n">Prix (cts)</th><th class="n">Prix</th><th class="n">Pièces par €</th><th class="n">Bonus affiché %</th><th>Étiquette / durée</th><th class="n">Ventes 30 j</th><th class="n">Revenus</th><th>En vente</th></tr></thead><tbody>
-      ${d.coinPacks.map((pk, i) => packRow('coinPacks.' + i, pk)).join('')}${packRow('welcomeOffer', d.welcomeOffer, 'offre de bienvenue')}${packRow('vipPass', d.vipPass, 'pass VIP : coffre toutes les ' + d.freeGains.chestEveryHoursVip + ' h, cosmétiques VIP')}
+      ${d.coinPacks.map((pk, i) => packRow('coinPacks.' + i, pk)).join('')}${packRow('welcomeOffer', d.welcomeOffer, 'offre de bienvenue')}${packRow('vipPass', d.vipPass, 'pass VIP : bonus quotidien doublé, coffre toutes les ' + d.freeGains.chestEveryHoursVip + ' h, +25 % d’XP, cosmétiques VIP')}
       </tbody></table></div><p class="muted small" style="margin:0">Les prix réels se règlent aussi dans App Store Connect et la Google Play Console : l’identifiant du pack doit y correspondre.</p></section>
       <section class="box"><h2>Cohérence des prix</h2><ul class="checks">${checks.map(([c, t]) => `<li class="${c}">${esc(t)}</li>`).join('')}</ul></section>`
       : `<section class="box"><header><h2>${KINDS.find(k => k[0] === UI.shopTab)[1]}</h2><p>${fmt(d.cosmetics[UI.shopTab].length)} articles</p></header>${cosTable(UI.shopTab)}</section>`}`;
@@ -716,7 +737,7 @@ VIEWS.reglages = () => {
           <tr><td>… au plus toutes les (heures)</td><td class="n">${field('freeGains.rescueEveryHours', 'number', 'w-s')}</td></tr>
         </tbody></table></div>
         <h3>Récompenses des missions</h3>
-        <div class="scroll"><table><tbody>${[['hands', 'Jouer N mains'], ['boards', 'Gagner N boards'], ['flush', 'Gagner un board avec une couleur ou mieux'], ['scoop', 'Rafler les 3 boards d’un pot']].map(([k, l]) => `<tr><td>${l}</td><td class="n">${field('missionRewards.' + k)}</td></tr>`).join('')}</tbody></table></div>
+        <div class="scroll"><table><tbody>${[['hands', 'Jouer N mains'], ['boards', 'Gagner N boards'], ['pots', 'Gagner N pots'], ['flush', 'Gagner un board avec une couleur ou mieux'], ['scoop', 'Rafler les 3 boards d’un pot']].map(([k, l]) => `<tr><td>${l}</td><td class="n">${field('missionRewards.' + k)}</td></tr>`).join('')}</tbody></table></div>
       </section>
       <section class="box"><h2>Annonce dans l’app</h2>
         <div class="formrow"><label for="f-announcement.active">Afficher sur l’accueil</label>${field('announcement.active', 'checkbox')}</div>
